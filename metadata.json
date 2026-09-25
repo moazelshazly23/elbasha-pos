@@ -1,0 +1,6 @@
+{
+  "name": "نظام مشويات الباشا لإدارة المطاعم ونقاط البيع | El Basha Grill POS",
+  "description": "نظام تجاري متكامل لإدارة المطاعم ونقاط البيع السريعة وشاشات المطبخ والمخزون والمشتريات والتقارير المالية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,39 @@
+{
+  "id": "/",
+  "name": "مشويات الباشا POS",
+  "short_name": "مشويات الباشا",
+  "description": "نظام إدارة المطاعم ونقاط البيع السريعة التجاري المستقل - مشويات الباشا POS",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape-primary",
+  "background_color": "#F8F5F0",
+  "theme_color": "#8B1E1E",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

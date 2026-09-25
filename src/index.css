@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  --brand-primary: #8B1E1E;
+  --brand-primary-hover: #721616;
+  --brand-dark: #231610;
+  --brand-accent: #B8860B;
+  --brand-secondary: #3F532B;
+  --brand-bg: #F8F5F0;
+  --brand-surface: #FFFFFF;
+}
+
+body {
+  font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+  background-color: var(--brand-bg);
+  color: var(--brand-dark);
+}
+
+/* Tabular figures for pricing and quantities */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Thermal receipt printable mode */
+@media print {
+  @page {
+    margin: 0;
+    size: auto;
+  }
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+}

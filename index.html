@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>نظام مشويات الباشا لإدارة المطاعم ونقاط البيع | El Basha Grill POS</title>
+    <meta name="description" content="نظام تجاري متكامل لإدارة المطاعم ونقاط البيع السريعة وشاشات المطبخ والمخزون والمشتريات والتقارير المالية." />
+    <meta property="og:title" content="نظام مشويات الباشا لإدارة المطاعم ونقاط البيع | El Basha Grill POS" />
+    <meta property="og:description" content="نظام تجاري متكامل لإدارة المطاعم ونقاط البيع السريعة وشاشات المطبخ والمخزون والمشتريات والتقارير المالية." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#8B1E1E" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="مشويات الباشا" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      @media print {
+        @page {
+          size: auto;
+          margin: 0mm;
+        }
+        body:not(.print-financial-report) {
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+          color: #000000 !important;
+          width: 80mm !important;
+          max-width: 80mm !important;
+        }
+        body.print-financial-report {
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+          color: #000000 !important;
+          width: 100% !important;
+          max-width: 100% !important;
+        }
+        body * {
+          visibility: hidden !important;
+        }
+        #thermal-receipt-print-area,
+        #thermal-receipt-print-area * {
+          visibility: visible !important;
+        }
+        #thermal-receipt-print-area {
+          display: block !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 80mm !important;
+          max-width: 80mm !important;
+          margin: 0 auto !important;
+          padding: 2mm 3mm !important;
+          box-sizing: border-box !important;
+          background: #ffffff !important;
+          color: #000000 !important;
+          font-family: 'Cairo', 'IBM Plex Sans Arabic', monospace, sans-serif !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        #financial-report-print-area,
+        #financial-report-print-area * {
+          visibility: visible !important;
+        }
+        #financial-report-print-area {
+          display: block !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          margin: 0 !important;
+          padding: 10mm !important;
+          box-sizing: border-box !important;
+          background: #ffffff !important;
+          color: #000000 !important;
+          font-family: 'Cairo', 'IBM Plex Sans Arabic', sans-serif !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        #thermal-receipt-print-area tr,
+        #thermal-receipt-print-area div,
+        #financial-report-print-area tr,
+        #financial-report-print-area div {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-[#F8F5F0] text-[#241A15] font-['Cairo',sans-serif] antialiased selection:bg-[#B8860B]/20 selection:text-[#8B1E1E]">
+    <div id="root"></div>
+    <div id="thermal-receipt-print-area" class="hidden print:block"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
