@@ -15,6 +15,9 @@ import {
   RefreshCw,
   UserCheck,
   Database,
+  Sparkles,
+  Cloud,
+  CheckCircle,
 } from 'lucide-react';
 import { useBrand } from '../../context/BrandContext';
 import { useAuth } from '../../context/AuthContext';
@@ -24,6 +27,8 @@ import { BrandLogo } from './BrandLogo';
 import { PWAInstallButton } from './PWAInstallButton';
 import { ConfirmModal } from './ConfirmModal';
 import { UserProfileModal } from './UserProfileModal';
+import { firebaseAuthService, AppAuthUser } from '../../services/firebase/authService';
+import { firestoreSyncService } from '../../services/firebase/firestoreSyncService';
 import { User, Ingredient } from '../../types';
 
 interface HeaderProps {
@@ -33,7 +38,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenShiftModal, onNavigateToTab }) => {
   const { profile } = useBrand();
-  const { currentUser, currentBranch, allBranches, setCurrentBranch, switchUser, logout, lockTerminal } = useAuth();
+  const { currentUser, currentBranch, allBranches, setCurrentBranch, switchUser, loginWithGoogle, logout, lockTerminal } = useAuth();
 
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
@@ -43,6 +48,52 @@ export const Header: React.FC<HeaderProps> = ({ onOpenShiftModal, onNavigateToTa
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [lowStockItems, setLowStockItems] = useState<Ingredient[]>([]);
+
+  // Firebase State
+  const [firebaseUser, setFirebaseUser] = useState<AppAuthUser | null>(firebaseAuthService.getCurrentUser());
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [cloudSyncSuccess, setCloudSyncSuccess] = useState(false);
+
+  useEffect(() => {
+    return firebaseAuthService.subscribe((user) => {
+      setFirebaseUser(user);
+    });
+  }, []);
+
+  const handleCloudSync = async () => {
+    if (!firebaseUser?.uid) return;
+    setIsSyncingCloud(true);
+    try {
+      const fullBackup = posDb.exportFullBackup();
+      const res = await firestoreSyncService.backupToCloud(firebaseUser.uid, fullBackup);
+      if (res.success) {
+        setCloudSyncSuccess(true);
+        setTimeout(() => setCloudSyncSuccess(false), 3000);
+      } else {
+        alert(res.error || 'تعذر استكمال المزامنة السحابية');
+      }
+    } catch (e: any) {
+      alert(e?.message || 'حدث خطأ أثناء المزامنة السحابية');
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    try {
+      const res = await firebaseAuthService.signInWithGoogle();
+      if (res.success && res.user) {
+        loginWithGoogle(res.user);
+        // Automatically perform initial cloud backup
+        const fullBackup = posDb.exportFullBackup();
+        await firestoreSyncService.backupToCloud(res.user.uid, fullBackup);
+      } else if (res.error) {
+        alert(res.error);
+      }
+    } catch (e: any) {
+      alert(e?.message || 'فشل الاتصال بـ Google');
+    }
+  };
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(() => syncQueue.getPendingCount());
   const [isBackupOverdue, setIsBackupOverdue] = useState<boolean>(() => posDb.isBackupOverdue(24));
   const [lastBackupTime, setLastBackupTime] = useState<string | null>(() => posDb.getLastBackupTimestamp());
@@ -123,7 +174,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenShiftModal, onNavigateToTa
   };
 
   return (
-    <header className="h-16 bg-white border-b border-[#E8DFD5] px-4 flex items-center justify-between sticky top-0 z-40 shadow-xs">
+    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-[#E8DFD5] px-4 flex items-center justify-between sticky top-0 z-40 shadow-xs select-none">
       {/* Right side (RTL Start): Brand Logo & Branch Info */}
       <div className="flex items-center gap-3">
         <BrandLogo
@@ -139,12 +190,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenShiftModal, onNavigateToTa
         <div className="relative">
           <button
             onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-[#F5EFE6] text-[#3E2723] hover:bg-[#EAE0D2] transition-colors border border-[#D7C3A5]/50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#F7F4EE] text-[#1F1511] hover:bg-[#EFE8DC] transition-colors border border-[#E5DACB]"
             title="تغيير الفرع"
           >
             <Store className="w-3.5 h-3.5 text-[#8B1E1E]" />
             <span className="max-w-[130px] truncate">{currentBranch.name}</span>
-            <ChevronDown className="w-3 h-3 text-[#6F4E37]" />
+            <ChevronDown className="w-3 h-3 text-[#7A6455]" />
           </button>
 
           {isBranchDropdownOpen && (
@@ -318,6 +369,40 @@ export const Header: React.FC<HeaderProps> = ({ onOpenShiftModal, onNavigateToTa
           )}
         </div>
 
+        {/* Firebase Google Auth & Cloud Sync */}
+        {firebaseUser ? (
+          <div className="flex items-center gap-2 bg-[#F7F4EE] px-2.5 py-1 rounded-lg border border-[#E5DACB]">
+            {firebaseUser.photoURL ? (
+              <img src={firebaseUser.photoURL} alt="" className="w-5 h-5 rounded-full border border-emerald-500 object-cover" />
+            ) : (
+              <Cloud className="w-4 h-4 text-emerald-600" />
+            )}
+            <div className="hidden lg:flex flex-col text-[10px] leading-tight text-right">
+              <span className="font-bold text-[#1F1511] max-w-[85px] truncate">{firebaseUser.displayName}</span>
+              <span className="text-emerald-700 flex items-center gap-0.5 font-bold">
+                <CheckCircle className="w-2.5 h-2.5" /> {cloudSyncSuccess ? 'تم الحفظ سحابياً!' : 'سحابي متصل'}
+              </span>
+            </div>
+            <button
+              onClick={handleCloudSync}
+              disabled={isSyncingCloud}
+              title="مزامنة فورية مع سحابة Firestore"
+              className="p-1 hover:bg-white rounded-lg text-[#8B1E1E] transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleGoogleAuth}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white text-[#1F1511] border border-[#E5DACB] hover:bg-[#F7F4EE] transition-colors shadow-2xs cursor-pointer"
+            title="تسجيل الدخول بواسطة Google والربط السحابي مع Firebase"
+          >
+            <Cloud className="w-3.5 h-3.5 text-[#8B1E1E]" />
+            <span className="hidden sm:inline font-semibold">ربط Google السحابي</span>
+          </button>
+        )}
+
         {/* Lock Terminal Button */}
         <button
           onClick={lockTerminal}
@@ -340,7 +425,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenShiftModal, onNavigateToTa
         <div className="relative">
           <button
             onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-            className="flex items-center gap-2 p-1.5 pr-2 rounded-lg text-xs font-semibold bg-[#F5EFE6] text-[#3E2723] hover:bg-[#EAE0D2] transition-colors border border-[#D7C3A5]/60"
+            className="flex items-center gap-2 p-1.5 pr-2.5 rounded-lg text-xs font-semibold bg-[#F7F4EE] text-[#1F1511] hover:bg-[#EFE8DC] transition-colors border border-[#E5DACB] cursor-pointer"
           >
             <div className="w-7 h-7 rounded-full bg-[#8B1E1E] text-white flex items-center justify-center font-bold text-xs shadow-xs">
               {currentUser?.avatar || (currentUser?.name || 'م').slice(0, 1)}

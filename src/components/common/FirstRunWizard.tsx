@@ -153,7 +153,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({ onComplete }) =>
           {currentStep === 1 && (
             <div className="space-y-4 text-center py-6">
               <div className="flex justify-center mb-4">
-                <BrandLogo size="lg" variant="full" customName={profileData.name} />
+                <BrandLogo
+                  size="lg"
+                  variant="full"
+                  customName={profileData.name}
+                  customLogoUrl={profileData.useOfficialLogo ? undefined : profileData.logoUrl}
+                />
               </div>
               <h3 className="text-2xl font-black text-[#8B1E1E]">
                 مرحباً بك في نظام {profileData.name} لإدارة المطاعم

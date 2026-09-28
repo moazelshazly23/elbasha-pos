@@ -56,4 +56,10 @@ export interface SQLitePathResult {
 export interface SQLiteSnapshotPayload {
   tableName: string;
   data: string;
+  targetPath?: string;
+}
+
+export interface AppDataPayload {
+  key: string;
+  data: string;
 }

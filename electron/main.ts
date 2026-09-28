@@ -28,6 +28,13 @@ const USER_DATA_PATH = path.join(
   APP_FOLDER_NAME
 );
 
+// Lock persistent Chromium userData path to %LOCALAPPDATA%\MosawyatAlBashaPOS\profile
+try {
+  app.setPath('userData', path.join(USER_DATA_PATH, 'profile'));
+} catch (e) {
+  console.warn('[Electron] Could not set custom userData path:', e);
+}
+
 const DATA_DIR = path.join(USER_DATA_PATH, 'data');
 const LOGS_DIR = path.join(USER_DATA_PATH, 'logs');
 const BACKUPS_DIR = path.join(USER_DATA_PATH, 'backups');
@@ -35,7 +42,7 @@ const SQLITE_DB_FILE = path.join(DATA_DIR, SQLITE_FILE_NAME);
 
 // Ensure directories exist outside Program Files to avoid Windows UAC restrictions
 function ensureSystemDirectories(): void {
-  const dirs = [USER_DATA_PATH, DATA_DIR, LOGS_DIR, BACKUPS_DIR];
+  const dirs = [USER_DATA_PATH, path.join(USER_DATA_PATH, 'profile'), DATA_DIR, LOGS_DIR, BACKUPS_DIR];
   dirs.forEach((dir) => {
     if (!fs.existsSync(dir)) {
       try {
@@ -213,10 +220,69 @@ ipcMain.handle('save-app-data', (_event, { key, data }: { key: string; data: str
   try {
     ensureSystemDirectories();
     const filePath = path.join(DATA_DIR, `${key}.json`);
-    fs.writeFileSync(filePath, data, 'utf8');
+    fs.writeFileSync(filePath, typeof data === 'string' ? data : JSON.stringify(data), 'utf8');
     return { success: true };
   } catch (err: any) {
     logSystemError(`Failed to save app data key: ${key}`, err);
+    return { success: false, error: err?.message };
+  }
+});
+
+// Load single key from disk
+ipcMain.handle('load-app-data', (_event, { key }: { key: string }) => {
+  try {
+    ensureSystemDirectories();
+    const filePath = path.join(DATA_DIR, `${key}.json`);
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath, 'utf8');
+      return { success: true, data: JSON.parse(raw) };
+    }
+    return { success: false, data: null };
+  } catch (err: any) {
+    logSystemError(`Failed to load app data key: ${key}`, err);
+    return { success: false, data: null, error: err?.message };
+  }
+});
+
+// Load all saved JSON tables from %LOCALAPPDATA%\MosawyatAlBashaPOS\data
+ipcMain.handle('load-all-data', () => {
+  try {
+    ensureSystemDirectories();
+    const result: Record<string, any> = {};
+    if (fs.existsSync(DATA_DIR)) {
+      const files = fs.readdirSync(DATA_DIR);
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const key = file.replace(/\.json$/, '');
+          try {
+            const raw = fs.readFileSync(path.join(DATA_DIR, file), 'utf8');
+            result[key] = JSON.parse(raw);
+          } catch (e) {
+            console.warn(`[Electron] Error parsing ${file}:`, e);
+          }
+        }
+      }
+    }
+    return { success: true, data: result };
+  } catch (err: any) {
+    logSystemError('load-all-data error', err);
+    return { success: false, data: {}, error: err?.message };
+  }
+});
+
+// Restore database snapshot
+ipcMain.handle('restore-database', (_event, { backupContent }: { backupContent: string }) => {
+  try {
+    ensureSystemDirectories();
+    const parsed = typeof backupContent === 'string' ? JSON.parse(backupContent) : backupContent;
+    for (const [key, value] of Object.entries(parsed)) {
+      const fileName = key.endsWith('.json') ? key : `${key}.json`;
+      const filePath = path.join(DATA_DIR, fileName);
+      fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf8');
+    }
+    return { success: true };
+  } catch (err: any) {
+    logSystemError('restore-database failed', err);
     return { success: false, error: err?.message };
   }
 });

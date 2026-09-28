@@ -29,15 +29,13 @@ export const defaultReceiptSettings: ReceiptSettings = {
   sloganArabic: 'أصالة المشويات المصرية والشامية على الفحم',
   sloganEnglish: 'Authentic Charcoal Grilled Delights',
   showAddress: true,
-  addressDetails: 'شارع جامعة الدول العربية، المهندسين، الجيزة',
+  addressDetails: '',
 
-  // Phone list
-  phones: [
-    { id: 'ph-1', number: '01012345678', label: 'الرقم الرئيسي', showOnReceipt: true },
-  ],
+  // Clean Phones list (zero demo data)
+  phones: [],
   showPhone: true,
-  showWhatsApp: true,
-  whatsAppNumber: '01012345678',
+  showWhatsApp: false,
+  whatsAppNumber: '',
   showEmail: false,
   email: '',
   showWebsite: false,
@@ -47,13 +45,13 @@ export const defaultReceiptSettings: ReceiptSettings = {
   showInstagram: false,
   instagramUrl: '',
 
-  // Tax & Regulatory
+  // Tax & Regulatory (Clean for production setup)
   showTaxNumber: true,
-  taxNumber: '482-910-384',
+  taxNumber: '',
   showCrNumber: true,
-  crNumber: '984210',
+  crNumber: '',
   showVatNumber: true,
-  vatNumber: 'EG-482910384',
+  vatNumber: '',
   taxRate: 14,
   taxLabel: 'ضريبة القيمة المضافة (VAT)',
 
@@ -104,15 +102,15 @@ export const initialProfile: RestaurantProfile = {
   slogan: 'أصالة المشويات المصرية والشامية على الفحم',
   sloganEnglish: 'Authentic Charcoal Grilled Delights',
   useOfficialLogo: true,
-  phone: '01012345678',
+  phone: '',
   phone2: '',
-  whatsapp: '01012345678',
+  whatsapp: '',
   email: '',
   website: '',
-  address: 'شارع جامعة الدول العربية، المهندسين، الجيزة',
-  taxNumber: '482-910-384',
-  crNumber: '984210',
-  vatNumber: 'EG-482910384',
+  address: '',
+  taxNumber: '',
+  crNumber: '',
+  vatNumber: '',
   taxRate: 14,
   taxLabel: 'ضريبة القيمة المضافة (VAT)',
   currency: 'ج.م',
@@ -129,10 +127,10 @@ export const initialProfile: RestaurantProfile = {
   darkColor: '#231610',
   bgColor: '#F8F5F0',
   setupCompleted: true,
-  receiptPrinterName: 'Xprinter XP-80C (Thermal 80mm)',
-  kitchenPrinterName: 'Kitchen-Printer-POS80 (Grill)',
-  barPrinterName: 'Bar-Beverage-58mm',
-  kitchenAutoPrint: true,
+  receiptPrinterName: '',
+  kitchenPrinterName: '',
+  barPrinterName: '',
+  kitchenAutoPrint: false,
   directPrintingEnabled: true,
   posFullscreenMode: false,
   singleInstanceLock: true,
@@ -140,7 +138,7 @@ export const initialProfile: RestaurantProfile = {
   buildNumber: '2026.03.WIN64',
   dataStoragePath: '%LOCALAPPDATA%\\MosawyatAlBashaPOS\\data',
   licenseStatus: 'commercial',
-  licenseKey: 'BSHA-COMM-9842-WINX',
+  licenseKey: 'COMMERCIAL-POS-PRODUCTION',
   cloudSyncEnabled: true,
   cloudSyncEndpoint: 'https://sync.basha-pos.local/v1',
   lastCloudSyncAt: new Date().toISOString(),
@@ -150,14 +148,15 @@ export const initialBranches: Branch[] = [
   {
     id: 'branch-1',
     name: 'الفرع الرئيسي',
-    address: 'شارع جامعة الدول العربية، المهندسين، الجيزة',
-    phone: '01012345678',
+    address: '',
+    phone: '',
     isMain: true,
     active: true,
     createdAt: new Date().toISOString(),
   },
 ];
 
+// Single real admin account required to operate the system
 export const initialUsers: User[] = [
   {
     id: 'user-admin',
@@ -173,12 +172,12 @@ export const initialUsers: User[] = [
   },
 ];
 
-// Production Clean - Zero Demo Data
+// ZERO DEMO / TRAINING DATA - Clean Production Schema
 export const initialCategories: Category[] = [];
 export const initialModifierGroups: ModifierGroup[] = [];
 export const initialIngredients: Ingredient[] = [];
-export const initialProducts: Product[] = [];
 export const initialRecipes: Recipe[] = [];
+export const initialProducts: Product[] = [];
 export const initialTables: RestaurantTable[] = [];
 export const initialCustomers: Customer[] = [];
 export const initialSuppliers: Supplier[] = [];

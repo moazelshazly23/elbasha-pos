@@ -31,6 +31,8 @@ import { posDb } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { useBrand } from '../../context/BrandContext';
 import { useToast } from '../../context/ToastContext';
+import { firebaseAuthService, AppAuthUser } from '../../services/firebase/authService';
+import { firestoreSyncService } from '../../services/firebase/firestoreSyncService';
 
 interface AdminDriveConfig {
   email: string;
@@ -119,6 +121,81 @@ export const BackupManager: React.FC = () => {
   const [pendingRestoreData, setPendingRestoreData] = useState<string | null>(null);
   const [previewInfo, setPreviewInfo] = useState<BackupPreviewInfo | null>(null);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
+
+  // Firebase Auth & Cloud Sync states
+  const [fbUser, setFbUser] = useState<AppAuthUser | null>(firebaseAuthService.getCurrentUser());
+  const [isFirebaseSyncing, setIsFirebaseSyncing] = useState(false);
+
+  useEffect(() => {
+    return firebaseAuthService.subscribe((u) => setFbUser(u));
+  }, []);
+
+  const handleFirebaseCloudBackup = async () => {
+    let targetUid = fbUser?.uid;
+    if (!targetUid) {
+      const res = await firebaseAuthService.signInWithGoogle();
+      if (!res.success || !res.user) {
+        showToast('يرجى تسجيل الدخول بحساب Google أولاً لربط السحابة', 'error');
+        return;
+      }
+      targetUid = res.user.uid;
+    }
+
+    setIsFirebaseSyncing(true);
+    try {
+      const fullBackup = posDb.exportFullBackup();
+      const res = await firestoreSyncService.backupToCloud(targetUid, fullBackup);
+      if (res.success) {
+        saveHistoryRecord('drive', `Firestore_Cloud_Backup_${getFormattedTimestamp()}.json`, new Blob([JSON.stringify(fullBackup)]).size);
+        showToast('تمت المزامنة وحفظ نسخة كاملة في سحابة Firestore بنجاح!', 'success');
+      } else {
+        showToast(`فشلت المزامنة السحابية: ${res.error}`, 'error');
+      }
+    } catch (e: any) {
+      showToast(e?.message || 'حدث خطأ أثناء المزامنة مع Firestore', 'error');
+    } finally {
+      setIsFirebaseSyncing(false);
+    }
+  };
+
+  const handleFirebaseCloudRestore = async () => {
+    let targetUid = fbUser?.uid;
+    if (!targetUid) {
+      const res = await firebaseAuthService.signInWithGoogle();
+      if (!res.success || !res.user) {
+        showToast('يرجى تسجيل الدخول بحساب Google أولاً للوصول لبياناتك السحابية', 'error');
+        return;
+      }
+      targetUid = res.user.uid;
+    }
+
+    setIsFirebaseSyncing(true);
+    try {
+      const res = await firestoreSyncService.loadFromCloud(targetUid);
+      if (res.success && res.data) {
+        setPendingRestoreData(JSON.stringify(res.data));
+        setPreviewInfo({
+          version: res.data.version || '1.0.0',
+          exportedAt: res.data.exportedAt || new Date().toISOString(),
+          restaurantName: res.data.profile?.name || 'مشويات الباشا',
+          branchesCount: res.data.branches?.length || 1,
+          productsCount: res.data.products?.length || 0,
+          ordersCount: res.data.orders?.length || 0,
+          customersCount: res.data.customers?.length || 0,
+          categoriesCount: res.data.categories?.length || 0,
+          usersCount: res.data.users?.length || 1,
+        });
+        setShowRestoreModal(true);
+        showToast('تم جلب النسخة السحابية بنجاح! راجع البيانات واضغط تأكيد الاسترجاع.', 'success');
+      } else {
+        showToast(res.error || 'لم يتم العثور على نسخة سحابية محفوظة لحسابك', 'error');
+      }
+    } catch (e: any) {
+      showToast(e?.message || 'تعذر استرجاع البيانات السحابية', 'error');
+    } finally {
+      setIsFirebaseSyncing(false);
+    }
+  };
 
   const saveHistoryRecord = (type: 'usb' | 'drive' | 'local', filename: string, sizeBytes: number) => {
     const record: BackupRecord = {
@@ -580,6 +657,70 @@ export const BackupManager: React.FC = () => {
 
       {/* Main Options Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* OPTION 0: FIREBASE FIRESTORE CLOUD DATABASE & AUTH */}
+        <div className="bg-gradient-to-br from-[#FFFDF9] to-[#F5EFE6] rounded-2xl border-2 border-[#B8860B]/60 p-5 space-y-4 shadow-sm relative overflow-hidden flex flex-col justify-between col-span-1 md:col-span-2">
+          <div className="space-y-3 relative z-10">
+            <div className="flex items-center justify-between">
+              <span className="px-2.5 py-1 bg-[#8B1E1E] text-white rounded-lg text-[10px] font-black tracking-wide flex items-center gap-1.5">
+                <Cloud className="w-3.5 h-3.5 text-amber-300" />
+                <span>قاعدة بيانات Firebase Firestore والمصادقة الآمنة (Google Auth)</span>
+              </span>
+              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>سحابة متصلة ونشطة</span>
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#8B1E1E] to-[#B8860B] text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Database className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-black text-sm text-[#231610]">
+                    المزامنة السحابية الدائمة وحفظ البيانات عبر Firestore
+                  </h4>
+                  <p className="text-xs text-[#6F4E37] mt-1 leading-relaxed max-w-xl">
+                    حفظ ومزامنة فورية لكافة المبيعات، المنتجات، الإعدادات، والورديات في قاعدة بيانات Google Firebase مع أمان متقدم ومصادقة مستخدمي النظام.
+                  </p>
+                  {fbUser ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-emerald-900 font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl w-fit">
+                      <span>الحساب المرتبط:</span>
+                      <span className="font-mono text-[#8B1E1E]">{fbUser.email || fbUser.displayName}</span>
+                      <span className="text-[10px] text-gray-500">({fbUser.role})</span>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs text-amber-800 font-bold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl w-fit">
+                      قم بربط حساب Google لحفظ ومزامنة واسترجاع بياناتك السحابية من أي مكان.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap sm:flex-col gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleFirebaseCloudBackup}
+                  disabled={isFirebaseSyncing}
+                  className="px-4 py-2.5 rounded-xl bg-[#8B1E1E] hover:bg-[#6A1414] text-white text-xs font-black transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <CloudUpload className={`w-4 h-4 ${isFirebaseSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isFirebaseSyncing ? 'جاري المزامنة...' : 'حفظ ومزامنة في Firestore الآن'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFirebaseCloudRestore}
+                  disabled={isFirebaseSyncing}
+                  className="px-4 py-2.5 rounded-xl bg-white hover:bg-[#F5EFE6] text-[#231610] border border-[#D7C3A5] text-xs font-bold transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <RotateCcw className="w-4 h-4 text-[#8B1E1E]" />
+                  <span>استرجاع البيانات من السحابة</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* OPTION 1: USB FLASH DRIVE BACKUP */}
         <div className="bg-white rounded-2xl border-2 border-emerald-200 p-5 space-y-4 shadow-xs relative overflow-hidden flex flex-col justify-between">
           <div className="absolute top-0 left-0 w-24 h-24 bg-emerald-50 rounded-br-full -z-0 pointer-events-none" />

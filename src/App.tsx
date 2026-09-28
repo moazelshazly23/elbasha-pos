@@ -76,7 +76,7 @@ const MainLayout: React.FC = () => {
       if (e.key === 'F2') {
         e.preventDefault();
         setActiveTab('pos');
-      } else if (e.key === 'F3') {
+      } else if (e.key === 'F3' && activeTab !== 'pos') {
         e.preventDefault();
         setActiveTab('kitchen');
       } else if (e.key === 'F4') {
@@ -119,7 +119,7 @@ const MainLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F5F0] text-[#231610] flex flex-col font-sans select-none antialiased" dir="rtl">
+    <div className="h-screen bg-[#F8F5F0] text-[#231610] flex flex-col font-sans select-none antialiased overflow-hidden" dir="rtl">
       {/* Offline Mode Banner */}
       <OfflineBanner />
 

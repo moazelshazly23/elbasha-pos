@@ -122,138 +122,124 @@ class POSDatabase {
 
     // 2. Check if database has already been initialized
     const isInitialized = localStorage.getItem(DB_INITIALIZED_KEY);
-    const currentProfile = this.sqliteEngine.selectById('restaurant_profile', 'profile_main');
 
-    if (!isInitialized || !currentProfile) {
-      windowsBridge.log('info', 'DB', 'تهيئة جداول النظام للإنتاج وتصفير البيانات التجريبية بالكامل');
+    if (!isInitialized) {
+      windowsBridge.log('info', 'DB', 'تهيئة جداول النظام للإنتاج');
       this.seedInitialDataToSQLite();
       localStorage.setItem(DB_INITIALIZED_KEY, 'true');
     }
 
-    // Automatically purge all legacy demo data across tables
-    this.purgeAllLegacyDemoData();
+    // 3. Immediately sync from Windows disk (%LOCALAPPDATA%\MosawyatAlBashaPOS\data)
+    this.syncWithWindowsDisk();
+
+    // 4. One-time permanent wipe of all demo/training data (Clean Production)
+    const DEMO_PURGE_FLAG = 'basha_zero_demo_data_clean_production_v1';
+    if (localStorage.getItem(DEMO_PURGE_FLAG) !== 'true') {
+      this.purgeAllDemoDataNow();
+      localStorage.setItem(DEMO_PURGE_FLAG, 'true');
+    }
   }
 
   /**
-   * Purges any legacy demo data from persistent storage to ensure clean production state
+   * Synchronizes database state directly with Windows local disk files
+   * Ensures that newly added or modified data persists, and deleted demo data stays deleted.
    */
-  private purgeAllLegacyDemoData(): void {
+  public async syncWithWindowsDisk(): Promise<void> {
     try {
-      const CLEAN_FLAG = 'basha_pos_demo_purge_v5';
-      const hasCleaned = localStorage.getItem(CLEAN_FLAG);
-
-      const orders = this.load<Order[]>(STORAGE_KEYS.ORDERS, []);
-      const products = this.load<Product[]>(STORAGE_KEYS.PRODUCTS, []);
-      const users = this.load<User[]>(STORAGE_KEYS.USERS, []);
-      const tables = this.load<RestaurantTable[]>(STORAGE_KEYS.TABLES, []);
-      const branches = this.load<Branch[]>(STORAGE_KEYS.BRANCHES, []);
-      const customers = this.load<Customer[]>(STORAGE_KEYS.CUSTOMERS, []);
-
-      const hasDemoOrders = orders.some((o) => o.id?.startsWith('ord-sample') || o.id?.startsWith('ord-hist'));
-      const hasDemoProducts = products.some((p) => p.id?.startsWith('prod-') && ['GRL-001', 'GRL-002', 'MEL-001'].includes(p.sku || ''));
-      const hasDemoUsers = users.some((u) => u.id === 'user-cashier' || u.name.includes('أحمد مصطفى'));
-      const hasDemoTables = tables.some((t) => t.id === 'tbl-1' || t.currentOrderId);
-      const hasDemoBranches = branches.some((b) => b.id === 'branch-2');
-      const hasDemoCustomers = customers.some((c) => c.id === 'cust-1');
-
-      if (!hasCleaned || hasDemoOrders || hasDemoProducts || hasDemoUsers || hasDemoTables || hasDemoBranches || hasDemoCustomers) {
-        windowsBridge.log('info', 'DB', 'تنظيف وتصفير شامل لجميع السجلات التجريبية لضمان نسخة إنتاجية جاهزة للعميل');
-
-        // Reset tables in local storage and SQLite
-        this.save(STORAGE_KEYS.ORDERS, []);
-        this.save(STORAGE_KEYS.HELD_ORDERS, []);
-        this.sqliteEngine.clearTable('orders');
-        this.sqliteEngine.clearTable('held_orders');
-
-        this.save(STORAGE_KEYS.PRODUCTS, []);
-        this.save(STORAGE_KEYS.CATEGORIES, []);
-        this.save(STORAGE_KEYS.MODIFIERS, []);
-        this.save(STORAGE_KEYS.RECIPES, []);
-        this.save(STORAGE_KEYS.INGREDIENTS, []);
-        this.sqliteEngine.clearTable('products');
-        this.sqliteEngine.clearTable('categories');
-        this.sqliteEngine.clearTable('modifier_groups');
-        this.sqliteEngine.clearTable('recipes');
-        this.sqliteEngine.clearTable('ingredients');
-
-        this.save(STORAGE_KEYS.TABLES, []);
-        this.sqliteEngine.clearTable('restaurant_tables');
-
-        this.save(STORAGE_KEYS.CUSTOMERS, []);
-        this.save(STORAGE_KEYS.SUPPLIERS, []);
-        this.sqliteEngine.clearTable('customers');
-        this.sqliteEngine.clearTable('suppliers');
-
-        this.save(STORAGE_KEYS.PURCHASES, []);
-        this.save(STORAGE_KEYS.EXPENSES, []);
-        this.sqliteEngine.clearTable('purchase_orders');
-        this.sqliteEngine.clearTable('expenses');
-
-        this.save(STORAGE_KEYS.SHIFTS, null);
-        this.save(STORAGE_KEYS.SHIFTS_HISTORY, []);
-        this.sqliteEngine.clearTable('shifts');
-        this.sqliteEngine.clearTable('shifts_history');
-
-        this.save(STORAGE_KEYS.AUDIT_LOGS, []);
-        this.sqliteEngine.clearTable('audit_logs');
-
-        // Ensure single real main branch
-        this.save(STORAGE_KEYS.BRANCHES, initialBranches);
-        this.sqliteEngine.clearTable('branches');
-        this.sqliteEngine.bulkInsertOrReplace('branches', initialBranches);
-
-        // Ensure single primary admin user
-        this.save(STORAGE_KEYS.USERS, initialUsers);
-        this.sqliteEngine.clearTable('users');
-        this.sqliteEngine.bulkInsertOrReplace('users', initialUsers);
-
-        localStorage.setItem(CLEAN_FLAG, 'true');
-        localStorage.setItem(DB_INITIALIZED_KEY, 'true');
+      const diskData = await windowsBridge.loadAllData();
+      if (!diskData || Object.keys(diskData).length === 0) {
+        return;
       }
-    } catch (e) {
-      console.warn('Error purging legacy demo data:', e);
+
+      let restoredAny = false;
+
+      // 1. Restore standard STORAGE_KEYS from disk
+      Object.entries(STORAGE_KEYS).forEach(([_, storageKey]) => {
+        if (diskData[storageKey] !== undefined) {
+          const diskVal = diskData[storageKey];
+          localStorage.setItem(storageKey, JSON.stringify(diskVal));
+          restoredAny = true;
+
+          const tableName = TABLE_MAP[storageKey];
+          if (tableName) {
+            if (Array.isArray(diskVal)) {
+              this.sqliteEngine.clearTable(tableName);
+              this.sqliteEngine.bulkInsertOrReplace(tableName, diskVal);
+            } else if (diskVal && typeof diskVal === 'object') {
+              this.sqliteEngine.insertOrReplace(tableName, { ...diskVal, id: diskVal.id || 'profile_main' });
+            }
+          }
+        }
+      });
+
+      // 2. Hydrate SQLite engine with any sqlite_* tables
+      this.sqliteEngine.hydrateFromDisk(diskData);
+
+      if (restoredAny) {
+        localStorage.setItem(DB_INITIALIZED_KEY, 'true');
+        windowsBridge.log('info', 'DB', 'تم مزامنة واسترجاع جميع بيانات النظام بنجاح من قرص Windows (%LOCALAPPDATA%)');
+        this.notify();
+      }
+    } catch (err) {
+      console.warn('Sync with Windows disk failed:', err);
     }
   }
 
   private cleanLegacyDemoSuppliers(): void {
-    // Handled by purgeAllLegacyDemoData
+    // Legacy stub
   }
 
   private seedInitialDataToSQLite(): void {
     this.sqliteEngine.transaction(() => {
-      this.sqliteEngine.insertOrReplace('restaurant_profile', { ...initialProfile, id: 'profile_main' });
-      this.sqliteEngine.bulkInsertOrReplace('branches', initialBranches);
-      this.sqliteEngine.bulkInsertOrReplace('users', initialUsers);
-      this.sqliteEngine.bulkInsertOrReplace('categories', initialCategories);
-      this.sqliteEngine.bulkInsertOrReplace('products', initialProducts);
-      this.sqliteEngine.bulkInsertOrReplace('modifier_groups', initialModifierGroups);
-      this.sqliteEngine.bulkInsertOrReplace('ingredients', initialIngredients);
-      this.sqliteEngine.bulkInsertOrReplace('recipes', initialRecipes);
-      this.sqliteEngine.bulkInsertOrReplace('restaurant_tables', initialTables);
-      this.sqliteEngine.bulkInsertOrReplace('customers', initialCustomers);
-      this.sqliteEngine.bulkInsertOrReplace('suppliers', initialSuppliers);
-      this.sqliteEngine.bulkInsertOrReplace('orders', initialOrders);
-      this.sqliteEngine.bulkInsertOrReplace('expenses', initialExpenses);
-      if (initialActiveShift) {
-        this.sqliteEngine.insertOrReplace('shifts', { ...initialActiveShift, id: initialActiveShift.id || 'active_shift' });
+      // ONLY initialize if key does not exist yet!
+      const existingProfile = localStorage.getItem(STORAGE_KEYS.PROFILE);
+      if (!existingProfile) {
+        this.sqliteEngine.insertOrReplace('restaurant_profile', { ...initialProfile, id: 'profile_main' });
+        localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(initialProfile));
+        windowsBridge.saveData(STORAGE_KEYS.PROFILE, JSON.stringify(initialProfile));
       }
+
+      const existingBranches = localStorage.getItem(STORAGE_KEYS.BRANCHES);
+      if (!existingBranches) {
+        this.sqliteEngine.bulkInsertOrReplace('branches', initialBranches);
+        localStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(initialBranches));
+        windowsBridge.saveData(STORAGE_KEYS.BRANCHES, JSON.stringify(initialBranches));
+      }
+
+      const existingUsers = localStorage.getItem(STORAGE_KEYS.USERS);
+      if (!existingUsers) {
+        this.sqliteEngine.bulkInsertOrReplace('users', initialUsers);
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
+        windowsBridge.saveData(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
+      }
+
+      // Initialize remaining business tables to empty array [] only if not present
+      const emptyTables: Array<{ key: string; tableName: string; defaultValue: any }> = [
+        { key: STORAGE_KEYS.CATEGORIES, tableName: 'categories', defaultValue: [] },
+        { key: STORAGE_KEYS.PRODUCTS, tableName: 'products', defaultValue: [] },
+        { key: STORAGE_KEYS.MODIFIERS, tableName: 'modifier_groups', defaultValue: [] },
+        { key: STORAGE_KEYS.INGREDIENTS, tableName: 'ingredients', defaultValue: [] },
+        { key: STORAGE_KEYS.RECIPES, tableName: 'recipes', defaultValue: [] },
+        { key: STORAGE_KEYS.TABLES, tableName: 'restaurant_tables', defaultValue: [] },
+        { key: STORAGE_KEYS.CUSTOMERS, tableName: 'customers', defaultValue: [] },
+        { key: STORAGE_KEYS.SUPPLIERS, tableName: 'suppliers', defaultValue: [] },
+        { key: STORAGE_KEYS.ORDERS, tableName: 'orders', defaultValue: [] },
+        { key: STORAGE_KEYS.EXPENSES, tableName: 'expenses', defaultValue: [] },
+        { key: STORAGE_KEYS.PURCHASES, tableName: 'purchase_orders', defaultValue: [] },
+        { key: STORAGE_KEYS.SHIFTS_HISTORY, tableName: 'shifts_history', defaultValue: [] },
+        { key: STORAGE_KEYS.HELD_ORDERS, tableName: 'held_orders', defaultValue: [] },
+        { key: STORAGE_KEYS.AUDIT_LOGS, tableName: 'audit_logs', defaultValue: [] },
+      ];
+
+      emptyTables.forEach(({ key, tableName, defaultValue }) => {
+        if (localStorage.getItem(key) === null) {
+          localStorage.setItem(key, JSON.stringify(defaultValue));
+          this.sqliteEngine.clearTable(tableName);
+          windowsBridge.saveData(key, JSON.stringify(defaultValue));
+        }
+      });
     });
 
-    // Mirror to standard local storage keys for instantaneous sync
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(initialProfile));
-    localStorage.setItem(STORAGE_KEYS.BRANCHES, JSON.stringify(initialBranches));
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
-    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(initialCategories));
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(initialProducts));
-    localStorage.setItem(STORAGE_KEYS.MODIFIERS, JSON.stringify(initialModifierGroups));
-    localStorage.setItem(STORAGE_KEYS.INGREDIENTS, JSON.stringify(initialIngredients));
-    localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(initialRecipes));
-    localStorage.setItem(STORAGE_KEYS.TABLES, JSON.stringify(initialTables));
-    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(initialCustomers));
-    localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(initialSuppliers));
-    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(initialOrders));
-    localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(initialExpenses));
-    localStorage.setItem(STORAGE_KEYS.SHIFTS, JSON.stringify(initialActiveShift));
     localStorage.setItem(DB_INITIALIZED_KEY, 'true');
   }
 
@@ -326,7 +312,20 @@ class POSDatabase {
       // 3. Sync to Desktop Local File / Electron bridge inside %LOCALAPPDATA%
       windowsBridge.saveData(key, serialized);
 
-      // 4. Notify all UI subscribers
+      // 4. Also persist SQLite table snapshot to Windows filesystem
+      if (tableName && typeof window !== 'undefined' && (window as any).electronAPI?.sqliteWriteSnapshot) {
+        try {
+          const records = Array.isArray(value) ? value : value ? [value] : [];
+          (window as any).electronAPI.sqliteWriteSnapshot({
+            tableName,
+            data: JSON.stringify(records),
+          });
+        } catch (snapErr) {
+          console.warn(`Snapshot write error for ${tableName}:`, snapErr);
+        }
+      }
+
+      // 5. Notify all UI subscribers
       this.notify();
     } catch (e) {
       console.error(`Failed to save ${key} to SQLite storage:`, e);
@@ -461,6 +460,10 @@ class POSDatabase {
     const cats = this.getCategories().filter((c) => c.id !== categoryId);
     this.save(STORAGE_KEYS.CATEGORIES, cats);
     syncQueue.enqueue('delete', 'categories', categoryId, { id: categoryId });
+  }
+
+  public loadOfficialBashaMenu(_force = false): void {
+    // Deprecated for Clean Production. No demo data is seeded.
   }
 
   // --- Products ---
@@ -1541,6 +1544,161 @@ class POSDatabase {
         action: 'تصفير شامل للبيانات التجريبية',
         category: 'system',
         details: 'تم مسح وتصفير كافة البيانات التجريبية بنجاح للبدء في التشغيل الفعلي للمطعم',
+        timestamp: new Date().toISOString(),
+      },
+    ];
+    this.save(STORAGE_KEYS.AUDIT_LOGS, inauguralAudit);
+
+    this.notify();
+  }
+
+  /**
+   * مسح وتصفير شامل لكافة البيانات التجريبية والتدريبية (Zero Demo Data - Clean Production Database)
+   * يحذف جميع المنتجات، التصنيفات، الطاولات، المخزون، الوصفات، المشتريات، المصروفات، العملاء، الموردين، والطلبات
+   * ويبقي فقط على هيكل النظام الأساسي وحساب المدير العام الفعلي المطلوب لتشغيل النظام
+   */
+  public purgeAllDemoDataNow(): void {
+    windowsBridge.log('info', 'DB', 'تصفير شامل وحذف كافة البيانات التجريبية والتدريبية بنجاح للتشغيل الفعلي');
+
+    // 1. مسح جميع المنتجات والتصنيفات والإضافات
+    this.save(STORAGE_KEYS.PRODUCTS, []);
+    this.save(STORAGE_KEYS.CATEGORIES, []);
+    this.save(STORAGE_KEYS.MODIFIERS, []);
+
+    // 2. مسح جميع عناصر المخزون والمكونات والوصفات
+    this.save(STORAGE_KEYS.INGREDIENTS, []);
+    this.save(STORAGE_KEYS.RECIPES, []);
+
+    // 3. مسح الطاولات وخريطة الصالة
+    this.save(STORAGE_KEYS.TABLES, []);
+
+    // 4. مسح جميع العمليات والطلبات والحركات المالية
+    this.save(STORAGE_KEYS.ORDERS, []);
+    this.save(STORAGE_KEYS.HELD_ORDERS, []);
+    this.save(STORAGE_KEYS.PURCHASES, []);
+    this.save(STORAGE_KEYS.EXPENSES, []);
+    this.save(STORAGE_KEYS.SHIFTS_HISTORY, []);
+    this.save('elbasha_shifts_history', []);
+
+    // 5. مسح العملاء والموردين التجريبيين
+    this.save(STORAGE_KEYS.CUSTOMERS, []);
+    this.save(STORAGE_KEYS.SUPPLIERS, []);
+
+    // 6. الإبقاء فقط على حساب المدير العام الحقيقي
+    this.save(STORAGE_KEYS.USERS, initialUsers);
+
+    // 7. تصفير الوردية الحالية وبدء وردية نظيفة بحسابات صفرية
+    const currentShift = this.getActiveShift();
+    const cleanShift: Shift = {
+      id: `shift-${Date.now()}`,
+      shiftNumber: '1',
+      userId: currentShift?.userId || 'user-admin',
+      userName: currentShift?.userName || 'المدير العام',
+      cashierId: currentShift?.cashierId || 'user-admin',
+      cashierName: currentShift?.cashierName || 'المدير العام',
+      branchId: currentShift?.branchId || 'branch-1',
+      branchName: currentShift?.branchName || 'الفرع الرئيسي',
+      startTime: new Date().toISOString(),
+      openedAt: new Date().toISOString(),
+      startingCash: 0,
+      cashSales: 0,
+      cardSales: 0,
+      otherSales: 0,
+      totalSales: 0,
+      ordersCount: 0,
+      expenses: 0,
+      expectedCash: 0,
+      status: 'open',
+    };
+    this.save(STORAGE_KEYS.SHIFTS, cleanShift);
+
+    // 8. تنظيف الطابعات والأجهزة وأرقام الهواتف التجريبية من الملف التعريفي
+    try {
+      const prof = this.getProfile();
+      if (prof) {
+        prof.receiptPrinterName = '';
+        prof.kitchenPrinterName = '';
+        prof.barPrinterName = '';
+        prof.phone = '';
+        prof.phone2 = '';
+        prof.whatsapp = '';
+        prof.address = '';
+        prof.taxNumber = '';
+        prof.crNumber = '';
+        prof.vatNumber = '';
+        if (prof.receiptSettings) {
+          prof.receiptSettings.phones = [];
+          prof.receiptSettings.whatsAppNumber = '';
+          prof.receiptSettings.addressDetails = '';
+          prof.receiptSettings.taxNumber = '';
+          prof.receiptSettings.crNumber = '';
+          prof.receiptSettings.vatNumber = '';
+        }
+        this.save(STORAGE_KEYS.PROFILE, prof);
+        this.sqliteEngine.insertOrReplace('restaurant_profile', { ...prof, id: 'profile_main' });
+        windowsBridge.saveData(STORAGE_KEYS.PROFILE, JSON.stringify(prof));
+      }
+    } catch (e) {
+      console.warn('Profile clean error:', e);
+    }
+
+    // 9. تفريغ محرك SQLite الداخلي
+    try {
+      this.sqliteEngine.clearTable('products');
+      this.sqliteEngine.clearTable('categories');
+      this.sqliteEngine.clearTable('modifier_groups');
+      this.sqliteEngine.clearTable('ingredients');
+      this.sqliteEngine.clearTable('recipes');
+      this.sqliteEngine.clearTable('restaurant_tables');
+      this.sqliteEngine.clearTable('orders');
+      this.sqliteEngine.clearTable('held_orders');
+      this.sqliteEngine.clearTable('expenses');
+      this.sqliteEngine.clearTable('purchase_orders');
+      this.sqliteEngine.clearTable('shifts_history');
+      this.sqliteEngine.clearTable('customers');
+      this.sqliteEngine.clearTable('suppliers');
+      this.sqliteEngine.clearTable('users');
+      this.sqliteEngine.bulkInsertOrReplace('users', initialUsers);
+    } catch (e) {
+      console.warn('SQLite clear table error:', e);
+    }
+
+    // 10. تفريغ طابور المزامنة
+    try {
+      syncQueue.clear();
+    } catch (e) {
+      console.warn('Sync queue clear error:', e);
+    }
+
+    // 11. مزامنة الحالة النظيفة مع ملفات قرص Windows
+    try {
+      windowsBridge.saveData(STORAGE_KEYS.PRODUCTS, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.CATEGORIES, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.MODIFIERS, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.INGREDIENTS, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.RECIPES, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.TABLES, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.CUSTOMERS, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.SUPPLIERS, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.ORDERS, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.HELD_ORDERS, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.PURCHASES, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.EXPENSES, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.SHIFTS_HISTORY, '[]');
+      windowsBridge.saveData(STORAGE_KEYS.USERS, JSON.stringify(initialUsers));
+    } catch (e) {
+      console.warn('Windows bridge save error:', e);
+    }
+
+    // 12. تسجيل قيد تدقيق نظيف لافتتاح النظام
+    const inauguralAudit: AuditLog[] = [
+      {
+        id: `audit-${Date.now()}`,
+        userId: 'admin',
+        userName: 'المدير العام',
+        action: 'تهيئة قاعدة البيانات الإنتاجية النظيفة',
+        category: 'system',
+        details: 'تم تفريغ كافة البيانات التجريبية والتدريبية بنجاح، والنظام في وضع الإنتاج الفعلي النظيف (Zero Demo Data)',
         timestamp: new Date().toISOString(),
       },
     ];

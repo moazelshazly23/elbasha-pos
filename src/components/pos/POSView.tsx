@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   Flame,
@@ -26,6 +26,7 @@ import {
   DollarSign,
   Keyboard,
   Package,
+  BarChart3,
 } from 'lucide-react';
 import { usePOS } from '../../context/POSContext';
 import { useBrand } from '../../context/BrandContext';
@@ -38,6 +39,8 @@ import { QuickCustomerModal } from './QuickCustomerModal';
 import { HeldOrdersModal } from './HeldOrdersModal';
 import { ShortcutsModal } from './ShortcutsModal';
 import { QuickAddItemModal } from './QuickAddItemModal';
+import { POSCustomerSearch } from './POSCustomerSearch';
+import { POSTopSellingChart } from './POSTopSellingChart';
 
 export const POSView: React.FC = () => {
   const { profile } = useBrand();
@@ -84,6 +87,7 @@ export const POSView: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [onlyPopular, setOnlyPopular] = useState<boolean>(false);
+  const [showTopSellingChart, setShowTopSellingChart] = useState<boolean>(true);
 
   // Modals state
   const [activeProductForModifier, setActiveProductForModifier] = useState<Product | null>(null);
@@ -93,8 +97,12 @@ export const POSView: React.FC = () => {
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
+  const customerSearchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    setCategories(posDb.getCategories());
+    setProducts(posDb.getProducts());
+
     const unsubscribe = posDb.subscribe(() => {
       setCategories(posDb.getCategories());
       setProducts(posDb.getProducts());
@@ -102,9 +110,16 @@ export const POSView: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  // Keyboard Shortcuts for Cashier Acceleration (F5: Hold, ESC: Cancel, F9: Drawer, F10: Checkout, F1: Help)
+  // Keyboard Shortcuts for Cashier Acceleration (F3: Customer Search, F5: Hold, ESC: Cancel, F9: Drawer, F10: Checkout, F1: Help)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // F3: التركيز السريع على حقل البحث عن العميل
+      if (e.key === 'F3') {
+        e.preventDefault();
+        customerSearchInputRef.current?.focus();
+        return;
+      }
+
       // F5: تعليق الطلب (Hold Order)
       if (e.key === 'F5') {
         e.preventDefault();
@@ -274,6 +289,21 @@ export const POSView: React.FC = () => {
               )}
             </div>
 
+            {/* Top 5 Best Selling Chart Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowTopSellingChart(!showTopSellingChart)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors border cursor-pointer ${
+                showTopSellingChart
+                  ? 'bg-[#140E0B] text-amber-200 border-[#C59A3F] shadow-xs'
+                  : 'bg-[#FFF8EF] text-[#8B1E1E] border-[#D7C3A5] hover:bg-[#F5EFE6]'
+              }`}
+              title="عرض أو إخفاء الرسم البياني لأكثر 5 أصناف مبيعاً اليوم (Recharts)"
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-[#C59A3F]" />
+              <span>توب 5 مبيعات اليوم</span>
+            </button>
+
             {/* Popular items filter button */}
             <button
               onClick={() => setOnlyPopular(!onlyPopular)}
@@ -292,14 +322,17 @@ export const POSView: React.FC = () => {
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
             <button
               onClick={() => setSelectedCategoryId('all')}
-              className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 border ${
+              className={`px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 border cursor-pointer ${
                 selectedCategoryId === 'all'
-                  ? 'bg-[#8B1E1E] text-white border-[#8B1E1E] shadow-xs'
-                  : 'bg-white text-[#3E2723] border-[#E8DFD5] hover:bg-[#F5EFE6]'
+                  ? 'bg-[#140E0B] text-amber-200 border-[#C59A3F]/50 shadow-2xs'
+                  : 'bg-white text-[#4A3B32] border-[#E5DACB] hover:bg-[#F7F4EE]'
               }`}
             >
+              <UtensilsCrossed className="w-3.5 h-3.5" />
               <span>جميع الأصناف</span>
-              <span className="text-[10px] opacity-80">({products.length})</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-num ${selectedCategoryId === 'all' ? 'bg-white/20 text-white' : 'bg-[#F7F4EE] text-[#7A6455]'}`}>
+                {products.length}
+              </span>
             </button>
 
             {categories.map((cat) => {
@@ -310,89 +343,99 @@ export const POSView: React.FC = () => {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategoryId(cat.id)}
-                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all flex items-center gap-1.5 border ${
+                  className={`px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 border cursor-pointer ${
                     isSelected
-                      ? 'bg-[#8B1E1E] text-white border-[#8B1E1E] shadow-xs'
-                      : 'bg-white text-[#3E2723] border-[#E8DFD5] hover:bg-[#F5EFE6]'
+                      ? 'bg-[#140E0B] text-amber-200 border-[#C59A3F]/50 shadow-2xs'
+                      : 'bg-white text-[#4A3B32] border-[#E5DACB] hover:bg-[#F7F4EE]'
                   }`}
                 >
                   {getCategoryIcon(cat.icon)}
                   <span>{cat.nameAr}</span>
-                  <span className="text-[10px] opacity-75 tabular-nums">({count})</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-num ${isSelected ? 'bg-white/20 text-white' : 'bg-[#F7F4EE] text-[#7A6455]'}`}>
+                    {count}
+                  </span>
                 </button>
               );
             })}
           </div>
         </div>
 
+        {/* Interactive Top 5 Best Selling Items Chart (Recharts) */}
+        {showTopSellingChart && (
+          <POSTopSellingChart onSelectProduct={handleProductClick} />
+        )}
+
         {/* Product Cards Grid */}
         <div className="flex-1 overflow-y-auto p-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3.5">
             {filteredProducts.map((product) => {
               const hasModifiers = product.modifierGroupIds && product.modifierGroupIds.length > 0;
+              const category = categories.find((c) => c.id === product.categoryId);
 
               return (
                 <div
                   key={product.id}
                   onClick={() => handleProductClick(product)}
-                  className="bg-white rounded-2xl border border-[#E8DFD5] hover:border-[#B8860B] overflow-hidden shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.98]"
+                  className="bg-white rounded-xl border border-[#E5DACB] hover:border-[#8B1E1E] overflow-hidden shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group active:scale-[0.98] select-none"
                 >
-                  {/* Product Image */}
-                  <div className="relative h-28 w-full bg-[#EAE0D2] overflow-hidden flex items-center justify-center">
-                    {product.image ? (
+                  {/* Card Header Top Accent / Visual Area */}
+                  {product.image ? (
+                    <div className="relative h-28 w-full bg-[#EFE8DC] overflow-hidden flex items-center justify-center">
                       <img
                         src={product.image}
                         alt={product.nameAr}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const parent = e.currentTarget.parentElement;
-                          if (parent && !parent.querySelector('.offline-placeholder')) {
-                            const ph = document.createElement('div');
-                            ph.className = 'offline-placeholder w-full h-full flex flex-col items-center justify-center bg-[#F5EFE6] text-[#8B1E1E] text-xs font-bold gap-1';
-                            ph.innerHTML = '<span class="text-base">🔥</span><span>مشويات الباشا</span>';
-                            parent.appendChild(ph);
-                          }
-                        }}
                       />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-[#F5EFE6] text-[#8B1E1E] text-xs font-bold">
-                        <span className="text-base">🔥</span>
-                        <span>مشويات الباشا</span>
-                      </div>
-                    )}
-
-                    {product.isPopular && (
-                      <div className="absolute top-2 right-2 bg-[#B8860B] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md shadow-xs flex items-center gap-0.5">
-                        <Sparkles className="w-2.5 h-2.5" />
-                        <span>مميز</span>
-                      </div>
-                    )}
-
-                    <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5" />
-                      <span>{product.prepTimeMinutes} د</span>
+                      {product.isPopular && (
+                        <div className="absolute top-2 right-2 bg-[#140E0B] text-amber-200 border border-[#C59A3F]/50 text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs flex items-center gap-1">
+                          <Sparkles className="w-2.5 h-2.5 text-[#C59A3F]" />
+                          <span>الأكثر طلباً</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="p-3 pb-0 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-[#8B1E1E] flex items-center gap-1">
+                        {category ? getCategoryIcon(category.icon) : <Flame className="w-3 h-3" />}
+                        <span>{category?.nameAr || 'مشويات'}</span>
+                      </span>
+
+                      {product.isPopular ? (
+                        <span className="text-[10px] text-[#C59A3F] font-bold flex items-center gap-1">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          <span>الأكثر طلباً</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[#A8988B] font-mono">
+                          {product.sku || ''}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Product Details */}
                   <div className="p-3 flex-1 flex flex-col justify-between">
                     <div>
-                      <h4 className="font-bold text-xs text-[#231610] line-clamp-1 leading-snug group-hover:text-[#8B1E1E] transition-colors">
+                      <h4 className="font-bold text-sm text-[#1F1511] line-clamp-2 leading-snug group-hover:text-[#8B1E1E] transition-colors">
                         {product.nameAr}
                       </h4>
-                      <span className="text-[10px] text-[#7A6455] line-clamp-1 mt-0.5">
-                        {product.nameEn}
-                      </span>
+                      {product.description && (
+                        <p className="text-[11px] text-[#7A6455] line-clamp-1 mt-1 leading-normal font-normal">
+                          {product.description}
+                        </p>
+                      )}
                     </div>
 
-                    <div className="mt-2 pt-2 border-t border-[#F5EFE6] flex items-center justify-between">
-                      <div className="text-xs font-black text-[#8B1E1E] tabular-nums">
-                        {product.price} {profile.currency}
+                    <div className="mt-3 pt-2 border-t border-[#F2ECE4] flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-gray-500 block leading-tight">السعر</span>
+                        <div className="text-sm font-extrabold text-[#8B1E1E] font-num">
+                          {product.price.toFixed(2)} <span className="text-[10px] font-bold">{profile.currency}</span>
+                        </div>
                       </div>
 
-                      <div className="w-7 h-7 rounded-lg bg-[#FFF8EF] border border-[#D7C3A5] text-[#8B1E1E] flex items-center justify-center group-hover:bg-[#8B1E1E] group-hover:text-white transition-colors">
+                      <div className="w-7 h-7 rounded-lg bg-[#F7F4EE] border border-[#E5DACB] text-[#8B1E1E] flex items-center justify-center group-hover:bg-[#8B1E1E] group-hover:text-white transition-all shadow-2xs group-hover:scale-105">
                         <Plus className="w-3.5 h-3.5" />
                       </div>
                     </div>
@@ -403,29 +446,42 @@ export const POSView: React.FC = () => {
           </div>
 
           {filteredProducts.length === 0 && (
-            <div className="text-center py-20 px-4 space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-[#FFF8EF] border border-[#D7C3A5] flex items-center justify-center text-[#8B1E1E] mx-auto shadow-2xs">
-                <Package className="w-6 h-6" />
+            <div className="text-center py-16 px-4 space-y-4 max-w-md mx-auto">
+              <div className="w-16 h-16 rounded-3xl bg-[#FFF8EF] border border-[#D7C3A5] flex items-center justify-center text-[#8B1E1E] mx-auto shadow-sm">
+                <UtensilsCrossed className="w-8 h-8" />
               </div>
-              <div className="font-extrabold text-sm text-[#231610]">
-                {products.length === 0
-                  ? 'قائمة الطعام فارغة حالياً'
-                  : 'لا توجد أصناف مطابقة للبحث أو التصنيف المحدد'}
+              <div>
+                <div className="font-extrabold text-base text-[#231610]">
+                  {products.length === 0
+                    ? 'قائمة الطعام فارغة حالياً'
+                    : 'لا توجد أصناف مطابقة للبحث أو التصنيف المحدد'}
+                </div>
+                <p className="text-xs text-[#7A6455] mt-1.5 leading-relaxed">
+                  {products.length === 0
+                    ? 'النظام مهيأ في وضع الإنتاج النظيف. يمكنك إضافة أصنافك وقوائمك الفعلية من شاشة إدارة المنتجات أو إضافة صنف سريع الآن.'
+                    : 'جرّب البحث باسم صنف آخر أو اختيار تصنيف مختلف من الشريط العلوي.'}
+                </p>
               </div>
-              <p className="text-xs text-[#7A6455] max-w-sm mx-auto">
-                {products.length === 0
-                  ? 'يمكنك إضافة أصناف المنيو وتصنيفاتها وأسعارها من تبويب "المنيو والأصناف" لبدء تسجيل طلبات البيع فوراً.'
-                  : 'جرّب البحث باسم صنف آخر أو اختيار تصنيف مختلف.'}
-              </p>
+
+              {products.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsQuickAddModalOpen(true)}
+                  className="px-5 py-2.5 rounded-xl bg-[#8B1E1E] hover:bg-[#721616] text-white text-xs font-bold shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-amber-300" />
+                  <span>إضافة صنف جديد للبيع (F6)</span>
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
       {/* ================= LEFT (RTL): POS Cart & Order Details Panel (35%) ================= */}
-      <div className="w-full lg:w-[420px] bg-white flex flex-col justify-between border-t lg:border-t-0 shadow-lg z-20">
+      <div className="w-full lg:w-[430px] bg-white flex flex-col justify-between border-t lg:border-t-0 shadow-lg z-20">
         {/* Cashier Quick Shortcuts Action Bar */}
-        <div className="p-2.5 bg-[#231610] text-white flex items-center justify-between gap-1.5 border-b border-[#3E2723]">
+        <div className="p-2 bg-[#18110D] text-white flex items-center justify-between gap-1.5 border-b border-[#2C1E17]">
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Hold Order Button (F5) */}
             <button
@@ -440,7 +496,7 @@ export const POSView: React.FC = () => {
                 }
               }}
               title="تعليق الطلب الحالي لحين خدمة زبون آخر (اختصار F5)"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#3E2723] hover:bg-[#5D4037] text-amber-300 text-xs font-bold transition-all border border-[#6F4E37]/60 active:scale-95 shadow-2xs"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#2E1D15] hover:bg-[#432A1E] text-amber-300 text-xs font-bold transition-all border border-amber-500/30 active:scale-95 shadow-2xs"
             >
               <PauseCircle className="w-3.5 h-3.5 text-amber-400" />
               <span>تعليق</span>
@@ -459,7 +515,7 @@ export const POSView: React.FC = () => {
               type="button"
               onClick={() => setIsQuickAddModalOpen(true)}
               title="إضافة صنف مخصص أو طلب سريع للفاتورة (اختصار F6)"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#3E2723] hover:bg-[#5D4037] text-amber-300 text-xs font-bold transition-all border border-[#6F4E37]/60 active:scale-95 shadow-2xs"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#2E1D15] hover:bg-[#432A1E] text-amber-300 text-xs font-bold transition-all border border-amber-500/30 active:scale-95 shadow-2xs"
             >
               <Plus className="w-3.5 h-3.5 text-amber-400" />
               <span>صنف سريع</span>
@@ -474,7 +530,7 @@ export const POSView: React.FC = () => {
                 type="button"
                 onClick={() => setIsHeldOrdersModalOpen(true)}
                 title="عرض قائمة الطلبات المعلقة واسترجاعها"
-                className="px-2 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-xs font-bold border border-amber-500/40 transition-colors flex items-center gap-1"
+                className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-xs font-bold border border-amber-500/40 transition-colors flex items-center gap-1"
               >
                 <span>المعلقات ({heldOrders.length})</span>
               </button>
@@ -484,8 +540,8 @@ export const POSView: React.FC = () => {
             <button
               type="button"
               onClick={() => openCashDrawer()}
-              title="فتح صندوق النقدية يدوياً وصوت الرنين وتسجيل الحركة (اختصار F9)"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#3E2723] hover:bg-[#5D4037] text-emerald-300 text-xs font-bold transition-all border border-[#6F4E37]/60 active:scale-95 shadow-2xs"
+              title="فتح صندوق النقدية يدوياً وتسجيل الحركة (اختصار F9)"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#142B1A] hover:bg-[#1C3E25] text-emerald-300 text-xs font-bold transition-all border border-emerald-500/40 active:scale-95 shadow-2xs"
             >
               <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
               <span>فتح الدرج</span>
@@ -500,11 +556,11 @@ export const POSView: React.FC = () => {
               onClick={() => cancelCart()}
               disabled={cartItems.length === 0}
               title="إلغاء الطلب وتفريغ السلة (اختصار ESC)"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#3E2723] hover:bg-red-950 text-red-300 text-xs font-bold transition-all border border-[#6F4E37]/60 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-2xs"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#2E1515] hover:bg-[#431E1E] text-rose-300 text-xs font-bold transition-all border border-rose-500/40 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-2xs"
             >
-              <Ban className="w-3.5 h-3.5 text-red-400" />
+              <Ban className="w-3.5 h-3.5 text-rose-400" />
               <span>إلغاء</span>
-              <kbd className="px-1.5 py-0.5 bg-black/40 text-[10px] text-red-200 rounded font-mono border border-red-500/30">
+              <kbd className="px-1.5 py-0.5 bg-black/40 text-[10px] text-rose-200 rounded font-mono border border-rose-500/30">
                 ESC
               </kbd>
             </button>
@@ -524,93 +580,86 @@ export const POSView: React.FC = () => {
         </div>
 
         {/* Order Setup Header: Type (Dine-in / Takeaway / Delivery), Table, Customer */}
-        <div className="p-3 bg-[#FBF9F6] border-b border-[#E8DFD5] space-y-2">
+        <div className="p-3 bg-[#FBF9F6] border-b border-[#E8DFD5] space-y-2.5">
           {/* Order Type Tabs */}
-          <div className="grid grid-cols-4 gap-1 p-1 bg-white rounded-xl border border-[#E8DFD5]">
+          <div className="grid grid-cols-4 gap-1 p-1 bg-[#F5EFE6] rounded-2xl border border-[#E8DFD5]">
             <button
               onClick={() => setOrderType('dine_in')}
-              className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 ${
                 orderType === 'dine_in'
                   ? 'bg-[#8B1E1E] text-white shadow-xs'
-                  : 'text-[#5C4033] hover:bg-[#F5EFE6]'
+                  : 'text-[#6F4E37] hover:bg-white/60'
               }`}
             >
-              <Grid className="w-3.5 h-3.5" />
+              <Grid className="w-4 h-4" />
               <span>صالات</span>
             </button>
 
             <button
               onClick={() => setOrderType('takeaway')}
-              className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 ${
                 orderType === 'takeaway'
                   ? 'bg-[#8B1E1E] text-white shadow-xs'
-                  : 'text-[#5C4033] hover:bg-[#F5EFE6]'
+                  : 'text-[#6F4E37] hover:bg-white/60'
               }`}
             >
-              <ShoppingBag className="w-3.5 h-3.5" />
+              <ShoppingBag className="w-4 h-4" />
               <span>سفري</span>
             </button>
 
             <button
               onClick={() => setOrderType('delivery')}
-              className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 ${
                 orderType === 'delivery'
                   ? 'bg-[#8B1E1E] text-white shadow-xs'
-                  : 'text-[#5C4033] hover:bg-[#F5EFE6]'
+                  : 'text-[#6F4E37] hover:bg-white/60'
               }`}
             >
-              <Bike className="w-3.5 h-3.5" />
+              <Bike className="w-4 h-4" />
               <span>توصيل</span>
             </button>
 
             <button
               onClick={() => setOrderType('pickup')}
-              className={`py-1.5 px-1 rounded-lg text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-1 ${
                 orderType === 'pickup'
                   ? 'bg-[#8B1E1E] text-white shadow-xs'
-                  : 'text-[#5C4033] hover:bg-[#F5EFE6]'
+                  : 'text-[#6F4E37] hover:bg-white/60'
               }`}
             >
-              <Users className="w-3.5 h-3.5" />
+              <Users className="w-4 h-4" />
               <span>استلام</span>
             </button>
           </div>
 
-          {/* Conditional Sub-selectors: Table for Dine In, Customer for Delivery/Pickup */}
-          <div className="flex items-center gap-2">
+          {/* Order Type Specific Controls & Direct Customer Search */}
+          <div className="space-y-2">
+            {/* Table picker for Dine In */}
             {orderType === 'dine_in' && (
               <button
+                type="button"
                 onClick={() => setIsTableModalOpen(true)}
-                className={`flex-1 py-1.5 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-between transition-colors ${
+                className={`w-full py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-between transition-colors shadow-2xs ${
                   selectedTable
                     ? 'bg-[#FFF8EF] border-[#8B1E1E] text-[#8B1E1E]'
                     : 'bg-white border-[#D7C3A5] text-[#3E2723] hover:bg-[#F5EFE6]'
                 }`}
               >
-                <div className="flex items-center gap-1.5">
-                  <Grid className="w-3.5 h-3.5 text-[#8B1E1E]" />
-                  <span>{selectedTable ? selectedTable.number : 'اختر رقم الطاولة *'}</span>
+                <div className="flex items-center gap-2">
+                  <Grid className="w-4 h-4 text-[#8B1E1E]" />
+                  <span>{selectedTable ? `طاولة ${selectedTable.number} (${selectedTable.section})` : 'اختر رقم الطاولة (F4) *'}</span>
                 </div>
-                <span className="text-[10px] text-[#7A6455]">تغيير</span>
+                <span className="text-[10px] text-[#8B1E1E] font-bold">تغيير</span>
               </button>
             )}
 
-            <button
-              onClick={() => setIsCustomerModalOpen(true)}
-              className={`flex-1 py-1.5 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-between transition-colors ${
-                selectedCustomer
-                  ? 'bg-[#FFF8EF] border-[#B8860B] text-[#B8860B]'
-                  : 'bg-white border-[#D7C3A5] text-[#3E2723] hover:bg-[#F5EFE6]'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 truncate">
-                <Users className="w-3.5 h-3.5 text-[#B8860B]" />
-                <span className="truncate">
-                  {selectedCustomer ? selectedCustomer.name : 'ربط عميل / هاتف'}
-                </span>
-              </div>
-              <span className="text-[10px] text-[#7A6455] shrink-0">تحديد</span>
-            </button>
+            {/* Direct Customer Search & Quick Attach Field */}
+            <POSCustomerSearch
+              selectedCustomer={selectedCustomer}
+              onSelectCustomer={setSelectedCustomer}
+              orderType={orderType}
+              inputRef={customerSearchInputRef}
+            />
           </div>
 
           {orderType === 'delivery' && (
@@ -844,16 +893,16 @@ export const POSView: React.FC = () => {
           <button
             onClick={() => setIsPaymentModalOpen(true)}
             disabled={cartItems.length === 0}
-            className="w-full py-3 px-4 rounded-xl bg-[#8B1E1E] hover:bg-[#721616] text-white font-extrabold text-sm shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between active:scale-[0.99]"
+            className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#8B1E1E] to-[#721616] hover:from-[#721616] hover:to-[#5A1212] text-white font-black text-sm shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-between active:scale-[0.99] select-none"
           >
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5" />
+              <CheckCircle2 className="w-5 h-5 text-amber-200" />
               <span>دفع وإنهاء الفاتورة</span>
-              <kbd className="px-1.5 py-0.5 rounded bg-black/20 text-[10px] font-mono text-amber-200 border border-white/20">
+              <kbd className="px-2 py-0.5 rounded-md bg-black/30 text-[10px] font-mono text-amber-200 border border-white/20">
                 F10
               </kbd>
             </div>
-            <span className="tabular-nums text-amber-200">
+            <span className="tabular-nums text-base font-black text-amber-200">
               {total.toFixed(2)} {profile.currency}
             </span>
           </button>

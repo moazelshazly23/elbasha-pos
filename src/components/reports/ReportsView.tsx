@@ -16,14 +16,25 @@ import {
   Eye,
   CheckCircle2,
   Filter,
+  Receipt,
+  Loader2,
+  FileCheck,
+  Sparkles,
+  Mail,
+  Clock,
 } from 'lucide-react';
 import { Order, Product, Expense } from '../../types';
 import { posDb } from '../../services/db';
 import { useBrand } from '../../context/BrandContext';
-import { FinancialReportModal } from './FinancialReportModal';
+import { FinancialReportModal, ReportDocType } from './FinancialReportModal';
+import { EmailReportSchedulerModal } from './EmailReportSchedulerModal';
+import { InteractiveSalesTrendsChart } from './InteractiveSalesTrendsChart';
+import { reportSchedulerService } from '../../services/reportSchedulerService';
 import {
+  downloadFinancialReportPDF,
+  downloadSalesReportPDF,
   triggerFinancialReportPrint,
-  downloadFinancialReportHTML,
+  triggerSalesReportPrint,
   FinancialReportData,
 } from '../../utils/financialReportPDF';
 
@@ -38,17 +49,29 @@ export const ReportsView: React.FC = () => {
   // Period Filter State
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('all');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [isDirectPrinting, setIsDirectPrinting] = useState(false);
+  const [reportModalType, setReportModalType] = useState<ReportDocType>('financial');
+  const [isExportingFinancialPDF, setIsExportingFinancialPDF] = useState(false);
+  const [isExportingSalesPDF, setIsExportingSalesPDF] = useState(false);
+  const [isEmailSchedulerOpen, setIsEmailSchedulerOpen] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // Initial check and subscribe
+    reportSchedulerService.checkAndRunDueSchedules(profile);
+    const scheduleInterval = setInterval(() => {
+      reportSchedulerService.checkAndRunDueSchedules(profile);
+    }, 60000);
+
     const unsubscribe = posDb.subscribe(() => {
       setOrders(posDb.getOrders());
       setProducts(posDb.getProducts());
       setExpenses(posDb.getExpenses());
     });
-    return unsubscribe;
-  }, []);
+    return () => {
+      clearInterval(scheduleInterval);
+      unsubscribe();
+    };
+  }, [profile]);
 
   // Filter orders by chosen period
   const { filteredOrders, periodLabel } = useMemo(() => {
@@ -156,9 +179,9 @@ export const ReportsView: React.FC = () => {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 
-  // Trigger Browser-Native Print for PDF Export
-  const handleExportPDF = async () => {
-    setIsDirectPrinting(true);
+  // 1. Direct Download: Financial Summary Report as PDF Document
+  const handleDownloadFinancialPDF = async () => {
+    setIsExportingFinancialPDF(true);
     setActionSuccessMsg(null);
     try {
       const reportData: FinancialReportData = {
@@ -166,18 +189,47 @@ export const ReportsView: React.FC = () => {
         orders: filteredOrders,
         expenses,
         periodLabel,
-        generatedBy: 'مدير الفرع / المدير المالي',
+        generatedBy: 'مدير الفرع / الإدارة المالية',
       };
-      await triggerFinancialReportPrint(reportData);
-      setActionSuccessMsg('تم إطلاق أمر الطباعة/الحفظ كـ PDF للمستند بنجاح!');
+      await downloadFinancialReportPDF(reportData);
+      setActionSuccessMsg('تم تنزيل مستند الملخص المالي كملف PDF بنجاح!');
       setTimeout(() => setActionSuccessMsg(null), 4500);
     } catch (err) {
-      console.error('Failed to trigger PDF export:', err);
+      console.error('Failed to export financial summary PDF:', err);
     } finally {
-      setIsDirectPrinting(false);
+      setIsExportingFinancialPDF(false);
     }
   };
 
+  // 2. Direct Download: Detailed Sales Data Report as PDF Document
+  const handleDownloadSalesPDF = async () => {
+    setIsExportingSalesPDF(true);
+    setActionSuccessMsg(null);
+    try {
+      const reportData: FinancialReportData = {
+        profile,
+        orders: filteredOrders,
+        expenses,
+        periodLabel,
+        generatedBy: 'مسؤول نقطة البيع / الكاشير',
+      };
+      await downloadSalesReportPDF(reportData);
+      setActionSuccessMsg('تم تنزيل تقرير حركة وبيانات المبيعات كملف PDF بنجاح!');
+      setTimeout(() => setActionSuccessMsg(null), 4500);
+    } catch (err) {
+      console.error('Failed to export sales data PDF:', err);
+    } finally {
+      setIsExportingSalesPDF(false);
+    }
+  };
+
+  // 3. Open Preview Modal for specific document
+  const handleOpenPreviewModal = (docType: ReportDocType) => {
+    setReportModalType(docType);
+    setIsReportModalOpen(true);
+  };
+
+  // 4. CSV Export
   const exportSalesCSV = () => {
     const headers = [
       'رقم الطلب',
@@ -227,48 +279,88 @@ export const ReportsView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-extrabold text-[#231610]">
-                  مركز التقارير والتحليلات المالية
+                  مركز التقارير والتحليلات وتصدير مستندات PDF
                 </h2>
                 <span className="px-2 py-0.5 rounded-full bg-[#FFF8EF] border border-[#D7C3A5] text-[#8B1E1E] text-[10px] font-extrabold">
                   {periodLabel}
                 </span>
               </div>
               <span className="text-xs text-[#7A6455]">
-                مؤشرات المبيعات، تفصيل طرق الدفع، الأصناف الأكثر ربحية، وتصدير التقارير الرسمية
+                توليد وتنزيل تقارير PDF المعتمدة للملخصات المالية، حركات المبيعات، ومطابقة الصندوق
               </span>
             </div>
           </div>
 
           {/* Action Export Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Preview Modal Button */}
+            {/* Direct Financial Summary PDF Download Button */}
             <button
-              onClick={() => setIsReportModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#D7C3A5] bg-[#FAF7F2] text-[#6F4E37] text-xs font-bold hover:bg-[#F0E8DD] transition-colors shadow-2xs"
-              title="معاينة نموذج التقرير المالي الرسمي A4"
+              onClick={handleDownloadFinancialPDF}
+              disabled={isExportingFinancialPDF}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8B1E1E] text-white text-xs font-black hover:bg-[#721616] transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+              title="تنزيل الملخص المالي التنفيذي بصيغة PDF فوراً"
             >
-              <Eye className="w-4 h-4 text-[#8B1E1E]" />
-              <span>معاينة المستند</span>
+              {isExportingFinancialPDF ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>جاري إنشاء PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>تحميل الملخص المالي (PDF)</span>
+                </>
+              )}
             </button>
 
-            {/* Export to PDF Button (Requested Feature) */}
+            {/* Direct Sales Data PDF Download Button */}
             <button
-              onClick={handleExportPDF}
-              disabled={isDirectPrinting}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8B1E1E] text-white text-xs font-black hover:bg-[#721616] transition-all shadow-xs disabled:opacity-50"
-              title="تصدير التقرير المالي وطباعته أو حفظه بتنسيق PDF"
+              onClick={handleDownloadSalesPDF}
+              disabled={isExportingSalesPDF}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#8B1E1E] bg-[#FFF8EF] text-[#8B1E1E] text-xs font-black hover:bg-[#FBECE1] transition-all shadow-2xs disabled:opacity-50 cursor-pointer"
+              title="تنزيل كشف حركة المبيعات وتفاصيل الفواتير بصيغة PDF"
             >
-              <Printer className="w-4 h-4" />
-              <span>{isDirectPrinting ? 'جاري التحضير...' : 'تصدير إلى PDF'}</span>
+              {isExportingSalesPDF ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-[#8B1E1E]" />
+                  <span>جاري إنشاء PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Receipt className="w-4 h-4 text-[#8B1E1E]" />
+                  <span>تحميل بيانات المبيعات (PDF)</span>
+                </>
+              )}
+            </button>
+
+            {/* Email Report Scheduler Button */}
+            <button
+              onClick={() => setIsEmailSchedulerOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-sky-300 bg-sky-50 text-sky-900 text-xs font-bold hover:bg-sky-100 transition-colors shadow-2xs cursor-pointer"
+              title="جدولة إرسال التقارير اليومية والأسبوعية للمدير عبر البريد الإلكتروني"
+            >
+              <Mail className="w-4 h-4 text-sky-700" />
+              <span>جدولة البريد للمدير</span>
+            </button>
+
+            {/* Preview Modal Button */}
+            <button
+              onClick={() => handleOpenPreviewModal('financial')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#D7C3A5] bg-[#FAF7F2] text-[#6F4E37] text-xs font-bold hover:bg-[#F0E8DD] transition-colors shadow-2xs cursor-pointer"
+              title="معاينة نماذج التقارير الرسمية قبل الطباعة أو الحفظ"
+            >
+              <Eye className="w-4 h-4 text-[#8B1E1E]" />
+              <span>معاينة وطباعة A4</span>
             </button>
 
             {/* CSV Export Button */}
             <button
               onClick={exportSalesCSV}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#D7C3A5] bg-[#FFF8EF] text-[#6F4E37] text-xs font-bold hover:bg-[#F5EFE6] transition-colors shadow-2xs"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#D7C3A5] bg-[#FFF8EF] text-[#6F4E37] text-xs font-bold hover:bg-[#F5EFE6] transition-colors shadow-2xs cursor-pointer"
+              title="تصدير جدول البيانات إلى Excel / CSV"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
-              <span>تصدير CSV</span>
+              <span>CSV</span>
             </button>
           </div>
         </div>
@@ -282,7 +374,7 @@ export const ReportsView: React.FC = () => {
             </span>
             <button
               onClick={() => setSelectedPeriod('all')}
-              className={`px-3 py-1 rounded-lg font-bold transition-all ${
+              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 selectedPeriod === 'all'
                   ? 'bg-[#8B1E1E] text-white shadow-xs'
                   : 'text-[#3E2723] hover:bg-[#EAE0D2]'
@@ -292,7 +384,7 @@ export const ReportsView: React.FC = () => {
             </button>
             <button
               onClick={() => setSelectedPeriod('today')}
-              className={`px-3 py-1 rounded-lg font-bold transition-all ${
+              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 selectedPeriod === 'today'
                   ? 'bg-[#8B1E1E] text-white shadow-xs'
                   : 'text-[#3E2723] hover:bg-[#EAE0D2]'
@@ -302,7 +394,7 @@ export const ReportsView: React.FC = () => {
             </button>
             <button
               onClick={() => setSelectedPeriod('yesterday')}
-              className={`px-3 py-1 rounded-lg font-bold transition-all ${
+              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 selectedPeriod === 'yesterday'
                   ? 'bg-[#8B1E1E] text-white shadow-xs'
                   : 'text-[#3E2723] hover:bg-[#EAE0D2]'
@@ -312,7 +404,7 @@ export const ReportsView: React.FC = () => {
             </button>
             <button
               onClick={() => setSelectedPeriod('last7')}
-              className={`px-3 py-1 rounded-lg font-bold transition-all ${
+              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 selectedPeriod === 'last7'
                   ? 'bg-[#8B1E1E] text-white shadow-xs'
                   : 'text-[#3E2723] hover:bg-[#EAE0D2]'
@@ -322,7 +414,7 @@ export const ReportsView: React.FC = () => {
             </button>
             <button
               onClick={() => setSelectedPeriod('thisMonth')}
-              className={`px-3 py-1 rounded-lg font-bold transition-all ${
+              className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
                 selectedPeriod === 'thisMonth'
                   ? 'bg-[#8B1E1E] text-white shadow-xs'
                   : 'text-[#3E2723] hover:bg-[#EAE0D2]'
@@ -332,9 +424,11 @@ export const ReportsView: React.FC = () => {
             </button>
           </div>
 
-          <div className="text-xs text-[#7A6455]">
-            عدد العمليات المحتسبة:{' '}
-            <strong className="text-[#8B1E1E] font-black">{filteredOrders.length}</strong> طلب
+          <div className="text-xs text-[#7A6455] flex items-center gap-2">
+            <span>
+              عدد العمليات المحتسبة:{' '}
+              <strong className="text-[#8B1E1E] font-black">{filteredOrders.length}</strong> طلب
+            </span>
           </div>
         </div>
 
@@ -347,9 +441,9 @@ export const ReportsView: React.FC = () => {
             </div>
             <button
               onClick={() => setActionSuccessMsg(null)}
-              className="text-emerald-900 hover:text-emerald-950 font-black text-xs"
+              className="text-emerald-900 hover:text-emerald-950 font-black text-xs cursor-pointer"
             >
-              تم
+              إغلاق
             </button>
           </div>
         )}
@@ -357,6 +451,65 @@ export const ReportsView: React.FC = () => {
 
       {/* Analytics Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* PDF Quick Download Showcase Banner */}
+        <div className="bg-linear-to-l from-[#FFF8EF] via-white to-[#FBF8F3] border border-[#D7C3A5] p-3.5 sm:p-4 rounded-2xl shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#8B1E1E] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <FileCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm text-[#231610]">
+                  تصدير المستندات الرسمية القابلة للتنزيل (PDF Download)
+                </span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded-md font-bold">
+                  جاهز للتحميل
+                </span>
+              </div>
+              <p className="text-xs text-[#7A6455] mt-0.5">
+                يمكنك تحميل تقرير الملخص المالي وقائمة الدخل أو بيان تفاصيل المبيعات بصيغة PDF فورية معتمدة للفرع ({periodLabel})
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <button
+              onClick={handleDownloadFinancialPDF}
+              disabled={isExportingFinancialPDF}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#8B1E1E] text-white text-xs font-black hover:bg-[#721616] transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+            >
+              {isExportingFinancialPDF ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              <span>تحميل الملخص المالي (PDF)</span>
+            </button>
+
+            <button
+              onClick={handleDownloadSalesPDF}
+              disabled={isExportingSalesPDF}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#D7C3A5] bg-white text-[#8B1E1E] text-xs font-black hover:bg-[#FFF8EF] transition-all shadow-2xs disabled:opacity-50 cursor-pointer"
+            >
+              {isExportingSalesPDF ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#8B1E1E]" />
+              ) : (
+                <Receipt className="w-3.5 h-3.5" />
+              )}
+              <span>تحميل بيانات المبيعات (PDF)</span>
+            </button>
+
+            <button
+              onClick={() => setIsEmailSchedulerOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-sky-300 bg-sky-50 text-sky-900 text-xs font-bold hover:bg-sky-100 transition-all shadow-2xs cursor-pointer"
+              title="جدولة إرسال التقارير اليومية والأسبوعية للمدير عبر البريد الإلكتروني"
+            >
+              <Mail className="w-3.5 h-3.5 text-sky-700" />
+              <span>جدولة البريد للمدير</span>
+            </button>
+          </div>
+        </div>
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-white p-4 rounded-2xl border border-[#E8DFD5] shadow-xs">
@@ -400,6 +553,9 @@ export const ReportsView: React.FC = () => {
             </span>
           </div>
         </div>
+
+        {/* Interactive Recharts Sales Trends & Staff Performance Comparison Chart */}
+        <InteractiveSalesTrendsChart orders={orders} profile={profile} />
 
         {/* Charts and Breakdown Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -468,25 +624,20 @@ export const ReportsView: React.FC = () => {
               <span>الأصناف الأكثر مبيعاً وإيراداً</span>
             </h3>
 
-            <div className="space-y-2 pt-1">
-              {topItems.map((item, idx) => (
+            <div className="space-y-2 pt-2">
+              {topItems.map((item, index) => (
                 <div
-                  key={idx}
-                  className="flex items-center justify-between p-2.5 bg-[#FBF9F6] border border-[#E8DFD5] rounded-xl text-xs"
+                  key={index}
+                  className="flex items-center justify-between p-2.5 bg-[#FFF8EF] rounded-xl border border-[#D7C3A5]"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-[#8B1E1E] text-white flex items-center justify-center font-bold text-xs">
-                      {idx + 1}
+                    <span className="w-5 h-5 rounded-full bg-[#8B1E1E] text-white flex items-center justify-center text-[10px] font-black">
+                      {index + 1}
                     </span>
-                    <div>
-                      <span className="font-extrabold text-[#231610]">{item.name}</span>
-                      <span className="text-[10px] text-gray-500 block">
-                        الكمية المباعة: <strong className="text-[#8B1E1E]">{item.count}</strong>
-                      </span>
-                    </div>
+                    <span className="font-bold text-xs text-[#231610]">{item.name}</span>
                   </div>
-
-                  <span className="font-extrabold text-sm text-[#8B1E1E] tabular-nums">
+                  <span className="font-black text-xs text-[#8B1E1E] tabular-nums">
+                    {item.count} وجبة •{' '}
                     {item.revenue.toLocaleString('ar-EG', { minimumFractionDigits: 2 })}{' '}
                     {profile.currency}
                   </span>
@@ -504,7 +655,17 @@ export const ReportsView: React.FC = () => {
 
         {/* Order Types distribution */}
         <div className="bg-white p-4 rounded-2xl border border-[#E8DFD5] shadow-xs space-y-2">
-          <h3 className="font-extrabold text-sm text-[#231610]">توزيع قنوات الطلبات</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-extrabold text-sm text-[#231610]">توزيع قنوات الطلبات</h3>
+            <button
+              onClick={handleDownloadSalesPDF}
+              disabled={isExportingSalesPDF}
+              className="text-xs text-[#8B1E1E] font-bold hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>تصدير حركة الطلبات كـ PDF</span>
+            </button>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
             <div className="p-3 bg-[#FFF8EF] rounded-xl border border-[#D7C3A5]">
               <span className="text-xs text-[#7A6455]">صالات وداخلي</span>
@@ -533,6 +694,17 @@ export const ReportsView: React.FC = () => {
         orders={filteredOrders}
         expenses={expenses}
         profile={profile}
+        periodLabel={periodLabel}
+        initialType={reportModalType}
+      />
+
+      {/* Email Report Scheduler Modal */}
+      <EmailReportSchedulerModal
+        isOpen={isEmailSchedulerOpen}
+        onClose={() => setIsEmailSchedulerOpen(false)}
+        profile={profile}
+        orders={filteredOrders}
+        expenses={expenses}
         periodLabel={periodLabel}
       />
     </div>

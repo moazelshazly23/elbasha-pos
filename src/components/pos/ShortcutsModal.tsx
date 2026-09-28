@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Keyboard, PauseCircle, Ban, DollarSign, CreditCard, LayoutGrid, UtensilsCrossed, Clock, HelpCircle } from 'lucide-react';
+import { X, Keyboard, PauseCircle, Ban, DollarSign, CreditCard, LayoutGrid, UtensilsCrossed, Clock, HelpCircle, Users } from 'lucide-react';
 
 interface ShortcutsModalProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
     {
       category: 'عمليات الكاشير والبيع المباشر',
       items: [
+        { key: 'F3', label: 'بحث فوري عن عميل (POS)', desc: 'التركيز على حقل البحث عن العميل وربطه بالطلب الحالي بالهاتف أو الاسم', icon: <Users className="w-4 h-4 text-amber-600" /> },
         { key: 'F5', label: 'تعليق الطلب الحالي', desc: 'حفظ السلة مؤقتاً لخدمة زبون آخر واسترجاعها بأي وقت', icon: <PauseCircle className="w-4 h-4 text-amber-600" /> },
         { key: 'F6', label: 'صنف حر وسريع (Quick Add)', desc: 'إضافة صنف أو طلب مخصص فورياً بدون الرجوع للمنيو', icon: <UtensilsCrossed className="w-4 h-4 text-orange-600" /> },
         { key: 'ESC', label: 'إلغاء الطلب / إغلاق النوافذ', desc: 'تفريغ السلة الحالية أو إغلاق النوافذ المنبثقة النشطة', icon: <Ban className="w-4 h-4 text-red-600" /> },

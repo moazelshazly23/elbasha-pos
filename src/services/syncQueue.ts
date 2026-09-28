@@ -119,6 +119,11 @@ class OfflineSyncQueue {
     return this.queue.filter((item) => item.status === 'pending' || item.status === 'failed').length;
   }
 
+  public clear(): void {
+    this.queue = [];
+    this.saveToStorage();
+  }
+
   public getQueue(): SyncQueueItem[] {
     return [...this.queue];
   }

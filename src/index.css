@@ -2,18 +2,33 @@
 
 :root {
   --brand-primary: #8B1E1E;
-  --brand-primary-hover: #721616;
-  --brand-dark: #231610;
-  --brand-accent: #B8860B;
-  --brand-secondary: #3F532B;
-  --brand-bg: #F8F5F0;
+  --brand-primary-hover: #731717;
+  --brand-primary-subtle: #FDF6EE;
+  --brand-dark: #1F1511;
+  --brand-charcoal: #140E0B;
+  --brand-accent: #C59A3F;
+  --brand-accent-hover: #B0852B;
+  --brand-secondary: #364B24;
+  --brand-bg: #F7F4EE;
   --brand-surface: #FFFFFF;
+  --brand-border: #E5DACB;
 }
 
 body {
   font-family: 'Cairo', system-ui, -apple-system, sans-serif;
   background-color: var(--brand-bg);
   color: var(--brand-dark);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-editorial {
+  font-family: 'Amiri', 'Cairo', serif;
+}
+
+.font-num {
+  font-family: 'Plus Jakarta Sans', 'Cairo', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Tabular figures for pricing and quantities */
@@ -21,23 +36,23 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Custom scrollbars */
+/* Custom premium scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.03);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(139, 30, 30, 0.15);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(139, 30, 30, 0.35);
 }
 
 /* Thermal receipt printable mode */

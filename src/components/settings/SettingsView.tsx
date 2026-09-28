@@ -20,6 +20,8 @@ import {
   Trash2,
   DollarSign,
   FileText,
+  Coins,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { RestaurantProfile } from '../../types';
 import { useBrand } from '../../context/BrandContext';
@@ -31,6 +33,7 @@ import { cashDrawer } from '../../utils/cashDrawer';
 import { useToast } from '../../context/ToastContext';
 import { CustomerReceiptSettings } from './CustomerReceiptSettings';
 import { BackupManager } from './BackupManager';
+import { CurrencySettingsManager } from './CurrencySettingsManager';
 import { defaultReceiptSettings } from '../../services/seedData';
 
 const CURRENCY_PRESETS = [
@@ -49,7 +52,7 @@ export const SettingsView: React.FC = () => {
   const { profile, updateProfile, resetBranding } = useBrand();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'branding' | 'financial' | 'printing' | 'backup' | 'desktop' | 'about' | 'sqlite'>('branding');
+  const [activeTab, setActiveTab] = useState<'branding' | 'financial' | 'currency' | 'printing' | 'backup' | 'desktop' | 'about' | 'sqlite'>('branding');
   const [formData, setFormData] = useState<RestaurantProfile>(() => {
     return {
       ...profile,
@@ -257,6 +260,23 @@ export const SettingsView: React.FC = () => {
           >
             <Building className="w-4 h-4" />
             <span>الضرائب والعملة والفرع</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('currency')}
+            className={`w-full text-right p-3 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer ${
+              activeTab === 'currency'
+                ? 'bg-[#8B1E1E] text-white shadow-xs'
+                : 'text-[#3E2723] hover:bg-[#F5EFE6]'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Coins className="w-4 h-4 text-amber-600" />
+              <span>العملات وتسعير القائمة</span>
+            </div>
+            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-emerald-100 text-emerald-800">
+              متعدد العملات
+            </span>
           </button>
 
           <button
@@ -540,9 +560,19 @@ export const SettingsView: React.FC = () => {
 
                 {/* Currency Presets */}
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-[#231610]">
-                    اختيار العملة سريعا (Currency Presets):
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-[#231610]">
+                      اختيار العملة سريعا (Currency Presets):
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('currency')}
+                      className="text-xs font-bold text-[#8B1E1E] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Coins className="w-3.5 h-3.5 text-amber-600" />
+                      <span>إدارة العملات وتحويل أسعار المنتجات ←</span>
+                    </button>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {CURRENCY_PRESETS.map((c, idx) => (
                       <button
@@ -686,6 +716,17 @@ export const SettingsView: React.FC = () => {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* CURRENCY & PRODUCT PRICE UPDATER TAB */}
+            {activeTab === 'currency' && (
+              <CurrencySettingsManager
+                profile={profile}
+                onProfileUpdated={(updated) => {
+                  updateProfile(updated);
+                  setFormData(updated);
+                }}
+              />
             )}
 
             {/* 3. PRINTING & HARDWARE TAB */}
@@ -926,6 +967,35 @@ export const SettingsView: React.FC = () => {
 
                 {/* Comprehensive Backup Manager (USB Flash Drive & Admin Google Drive) */}
                 <BackupManager />
+
+                {/* Purge Demo Data for Production Launch */}
+                <div className="p-5 rounded-2xl bg-[#FFF8EF] border border-[#E5DACB] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[#8B1E1E]">
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                      <span>حذف وتصفير كافة البيانات التجريبية (Purge Demo Data)</span>
+                    </div>
+                    <span className="text-[10px] bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded-full">
+                      تجهيز التشغيل الفعلي
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-700 leading-relaxed">
+                    يقوم هذا الإجراء بحذف وتصفير جميع الفواتير والمبيعات التجريبية، المصروفات، العملاء التجريبيين، وسجل الورديات السابقة للبدء الفعلي للمطعم بحسابات نظيفة 100% مع الاحتفاظ الكامل بقائمة أصناف منيو مشويات الباشا والطاولات.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('هل أنت متأكد من رغبتك في حذف وتصفير كافة البيانات والعمليات التجريبية نهائياً؟')) {
+                        posDb.purgeAllDemoDataNow();
+                        showToast('تم حذف وتصفير كافة البيانات التجريبية بنجاح للتشغيل الفعلي!', 'success');
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 cursor-pointer shadow-2xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>تصفير وحذف البيانات التجريبية الآن</span>
+                  </button>
+                </div>
               </div>
             )}
 

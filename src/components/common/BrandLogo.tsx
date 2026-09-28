@@ -20,19 +20,19 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
     const sizeClasses = {
       sm: 'h-8 max-w-[120px]',
       md: 'h-12 max-w-[160px]',
-      lg: 'h-20 max-w-[240px]',
-      xl: 'h-32 max-w-[320px]',
+      lg: 'h-24 max-w-[200px]',
+      xl: 'h-32 max-w-[280px]',
     };
 
     return (
-      <div className={`flex items-center gap-2 select-none ${className}`}>
+      <div className={`flex flex-col items-center justify-center select-none ${className}`}>
         <img
           src={customLogoUrl}
           alt={customName || 'Restaurant Logo'}
-          className={`${sizeClasses[size]} object-contain`}
+          className={`${sizeClasses[size]} w-auto object-contain rounded-lg drop-shadow-md`}
         />
         {variant !== 'icon' && customName && (
-          <span className="font-bold text-lg text-[#241611] tracking-wide">
+          <span className="font-bold text-sm text-inherit mt-2 tracking-wide text-center">
             {customName}
           </span>
         )}
@@ -148,15 +148,44 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   const containerDimensions = {
     sm: 'w-24',
     md: 'w-36',
-    lg: 'w-48',
-    xl: 'w-64',
+    lg: 'w-48 max-w-full',
+    xl: 'w-64 max-w-full',
   };
+
+  const trimmedName = customName?.trim() || '';
+  const isBashaBrand = !trimmedName || trimmedName === 'مشويات الباشا' || trimmedName === 'الباشا' || trimmedName.includes('الباشا');
+
+  // Master wordmark title (e.g. "الباشا")
+  const primaryTitle = isBashaBrand
+    ? 'الباشا'
+    : (trimmedName.replace(/^(مشويات|مطعم|شواية|كبابجي)\s+/, '') || trimmedName || 'الباشا');
+
+  // Subtitle (e.g. "مشويات الباشا")
+  const secondaryTitle = isBashaBrand
+    ? 'مشويات الباشا'
+    : (trimmedName || 'مشويات الباشا');
+
+  // English subtitle
+  const englishTitle = isBashaBrand
+    ? 'EL BASHA GRILL'
+    : 'EL BASHA GRILL';
+
+  // Font size calculation ensuring letters are NEVER clipped by boundaries
+  const mainFontSize = primaryTitle.length <= 6
+    ? 66
+    : primaryTitle.length <= 8
+    ? 50
+    : primaryTitle.length <= 11
+    ? 38
+    : 30;
+
+  const subFontSize = secondaryTitle.length <= 14 ? 20 : 16;
 
   return (
     <div className={`flex flex-col items-center select-none text-center ${containerDimensions[size]} ${className}`}>
       <svg
         viewBox="0 0 300 330"
-        className="w-full h-auto drop-shadow-md"
+        className="w-full h-auto drop-shadow-md overflow-visible"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
@@ -253,7 +282,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           <polygon points="150,173 155,178 150,183 145,178" fill="#8B1E1E" />
         </g>
 
-        {/* --- Main 3D Calligraphy: الباشا --- */}
+        {/* --- Main 3D Calligraphy: Master Brand Wordmark --- */}
         <g filter="url(#subtleDrop)">
           {/* Shadow layer */}
           <text
@@ -261,18 +290,22 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
             y="245"
             textAnchor="middle"
             fill="#140D0A"
-            fontSize="74"
+            fontSize={mainFontSize}
             fontWeight="900"
             fontFamily="'Cairo', 'Amiri', 'Traditional Arabic', serif"
-            letterSpacing="-1"
+            letterSpacing="-0.5"
           >
-            {customName || 'الباشا'}
+            {primaryTitle}
           </text>
           
-          {/* Golden Diamond Dots for Arabic Calligraphy */}
-          <polygon points="108,186 116,194 108,202 100,194" fill="url(#goldBevel)" stroke="#5E3F0A" strokeWidth="0.8" />
-          <polygon points="122,176 130,184 122,192 114,184" fill="url(#goldBevel)" stroke="#5E3F0A" strokeWidth="0.8" />
-          <polygon points="172,254 180,262 172,270 164,262" fill="url(#goldBevel)" stroke="#5E3F0A" strokeWidth="0.8" />
+          {/* Golden Diamond Dots for Arabic Calligraphy (specifically positioned for الباشا) */}
+          {isBashaBrand && (
+            <>
+              <polygon points="108,186 116,194 108,202 100,194" fill="url(#goldBevel)" stroke="#5E3F0A" strokeWidth="0.8" />
+              <polygon points="122,176 130,184 122,192 114,184" fill="url(#goldBevel)" stroke="#5E3F0A" strokeWidth="0.8" />
+              <polygon points="172,254 180,262 172,270 164,262" fill="url(#goldBevel)" stroke="#5E3F0A" strokeWidth="0.8" />
+            </>
+          )}
         </g>
 
         {/* --- Sub-Heading: مشويات الباشا --- */}
@@ -288,11 +321,11 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
             y="278"
             textAnchor="middle"
             fill="#364C23"
-            fontSize="21"
+            fontSize={subFontSize}
             fontWeight="800"
             fontFamily="'Cairo', sans-serif"
           >
-            مشويات الباشا
+            {secondaryTitle}
           </text>
 
           {/* Right Flanking Diamond Spear */}
@@ -312,7 +345,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           fontFamily="'Cinzel', 'Trajan Pro', 'Cairo', serif"
           letterSpacing="4"
         >
-          EL BASHA GRILL
+          {englishTitle}
         </text>
 
         {/* --- Bottom Ornate Spear Ornament --- */}

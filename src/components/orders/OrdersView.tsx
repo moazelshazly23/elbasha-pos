@@ -38,6 +38,8 @@ export const OrdersView: React.FC = () => {
 
   const [orders, setOrders] = useState<Order[]>(() => posDb.getOrders());
   const [searchTerm, setSearchTerm] = useState('');
+  const [orderIdFilter, setOrderIdFilter] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<'all' | 'cash' | 'card' | 'other'>('all');
   const [deletingOrder, setDeletingOrder] = useState<{ id: string; orderNumber: string } | null>(null);
@@ -103,6 +105,8 @@ export const OrdersView: React.FC = () => {
 
   const handleResetFilters = () => {
     setSearchTerm('');
+    setOrderIdFilter('');
+    setCustomerFilter('');
     setStatusFilter('all');
     setPaymentMethodFilter('all');
     setDatePreset('all');
@@ -144,6 +148,8 @@ export const OrdersView: React.FC = () => {
   // Determine if any filter is active
   const isFiltered =
     searchTerm.trim() !== '' ||
+    orderIdFilter.trim() !== '' ||
+    customerFilter.trim() !== '' ||
     statusFilter !== 'all' ||
     paymentMethodFilter !== 'all' ||
     startDate !== '' ||
@@ -155,7 +161,23 @@ export const OrdersView: React.FC = () => {
     // 1. Status Filter
     if (statusFilter !== 'all' && o.status !== statusFilter) return false;
 
-    // 2. Search Query (Order Number, ID, Customer Name, Phone, Table, Cashier, Item Names)
+    // 2. Specific Order ID Filter
+    if (orderIdFilter.trim() !== '') {
+      const q = orderIdFilter.trim().toLowerCase().replace(/^#/, '');
+      const matchNum = o.orderNumber?.toLowerCase().includes(q);
+      const matchId = o.id?.toLowerCase().includes(q);
+      if (!matchNum && !matchId) return false;
+    }
+
+    // 3. Specific Customer Name / Phone Filter
+    if (customerFilter.trim() !== '') {
+      const q = customerFilter.trim().toLowerCase();
+      const matchCust = o.customerName?.toLowerCase().includes(q);
+      const matchPhone = o.customerPhone?.includes(q);
+      if (!matchCust && !matchPhone) return false;
+    }
+
+    // 4. General Search Query (Order Number, ID, Customer Name, Phone, Table, Cashier, Item Names)
     if (searchTerm.trim() !== '') {
       const q = searchTerm.toLowerCase();
       const matchNum = o.orderNumber?.toLowerCase().includes(q);
@@ -175,7 +197,7 @@ export const OrdersView: React.FC = () => {
       }
     }
 
-    // 3. Payment Method Filter
+    // 5. Payment Method Filter
     if (paymentMethodFilter !== 'all') {
       const hasMatchingPayment = o.payments?.some((p) => {
         if (paymentMethodFilter === 'cash') return p.method === 'cash';
@@ -186,7 +208,7 @@ export const OrdersView: React.FC = () => {
       if (!hasMatchingPayment) return false;
     }
 
-    // 4. Date Range Filter (Payment Date / Order Creation Date)
+    // 6. Date Range Filter (Payment Date / Order Creation Date)
     if (startDate || endDate) {
       const orderDate = new Date(o.createdAt).getTime();
 
@@ -336,6 +358,10 @@ export const OrdersView: React.FC = () => {
         <OrderFilterBar
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
+          orderIdFilter={orderIdFilter}
+          onOrderIdFilterChange={setOrderIdFilter}
+          customerFilter={customerFilter}
+          onCustomerFilterChange={setCustomerFilter}
           startDate={startDate}
           endDate={endDate}
           datePreset={datePreset}

@@ -450,6 +450,7 @@ export interface RestaurantProfile {
   cloudSyncEnabled?: boolean;
   cloudSyncEndpoint?: string;
   lastCloudSyncAt?: string;
+  multiCurrencySettings?: MultiCurrencySettings;
 }
 
 export interface HeldOrder {
@@ -472,3 +473,74 @@ export interface HeldOrder {
   total: number;
   itemCount: number;
 }
+
+// ==========================================
+// Multi-Currency & Price Management Types
+// ==========================================
+
+export interface CurrencyInfo {
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  symbolAr: string;
+  symbolEn: string;
+  exchangeRate: number; // 1 Base Currency = X Target Currency
+  isBase: boolean;
+  isActive: boolean;
+  roundingRule?: 'none' | 'decimal2' | 'ceil' | 'round5' | 'round10';
+  lastUpdated?: string;
+}
+
+export interface MultiCurrencySettings {
+  baseCurrency: string;
+  baseSymbol: string;
+  supportedCurrencies: CurrencyInfo[];
+  allowSecondaryCurrencyInPOS: boolean;
+  secondaryCurrencyCode?: string;
+  autoUpdatePricesOnBaseChange: boolean;
+  priceRounding: 'none' | 'decimal2' | 'ceil' | 'round5' | 'round10';
+  lastRateUpdate?: string;
+}
+
+// ==========================================
+// Scheduled Reports (Email) Types
+// ==========================================
+
+export type ReportScheduleFrequency = 'daily' | 'weekly';
+export type ReportContentType = 'financial_summary' | 'sales_data' | 'comprehensive';
+
+export interface ReportScheduleConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  frequency: ReportScheduleFrequency;
+  timeOfDay: string; // 'HH:mm', e.g. '23:00'
+  dayOfWeek?: number; // 0=Sunday, 1=Monday, ..., 5=Friday, 6=Saturday
+  managerEmail: string;
+  managerName?: string;
+  ccEmails?: string[];
+  reportType: ReportContentType;
+  format: 'pdf_and_html' | 'pdf_only' | 'html_only';
+  includeExecutiveCharts: boolean;
+  lastRunAt?: string;
+  lastStatus?: 'success' | 'failed' | 'skipped';
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReportScheduleLog {
+  id: string;
+  scheduleId: string;
+  scheduleName: string;
+  sentAt: string;
+  recipientEmail: string;
+  frequency: ReportScheduleFrequency;
+  reportType: ReportContentType;
+  status: 'sent' | 'opened_client' | 'failed';
+  totalRevenue: number;
+  ordersCount: number;
+  periodLabel: string;
+  message?: string;
+}
+

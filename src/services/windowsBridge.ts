@@ -62,6 +62,34 @@ class WindowsDesktopBridge {
     }
   }
 
+  public async loadAllData(): Promise<Record<string, any>> {
+    try {
+      if (this.isElectronRuntime && (window as any).electronAPI?.loadAllData) {
+        const res = await (window as any).electronAPI.loadAllData();
+        if (res?.success && res.data) {
+          return res.data;
+        }
+      }
+    } catch (e) {
+      console.warn('windowsBridge loadAllData IPC warning:', e);
+    }
+    return {};
+  }
+
+  public async loadAppData(key: string): Promise<any | null> {
+    try {
+      if (this.isElectronRuntime && (window as any).electronAPI?.loadAppData) {
+        const res = await (window as any).electronAPI.loadAppData({ key });
+        if (res?.success && res.data !== undefined) {
+          return res.data;
+        }
+      }
+    } catch (e) {
+      console.warn(`windowsBridge loadAppData(${key}) IPC warning:`, e);
+    }
+    return null;
+  }
+
   public getSystemInfo(): WindowsSystemInfo {
     return {
       isWindowsApp: true,

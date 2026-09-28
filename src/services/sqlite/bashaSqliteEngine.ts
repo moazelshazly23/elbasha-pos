@@ -147,6 +147,45 @@ export class BashaSqliteEngine {
   }
 
   /**
+   * Hydrates memory tables directly from disk files read by Electron or recovery
+   */
+  public hydrateFromDisk(diskData: Record<string, any>): void {
+    if (!diskData || typeof diskData !== 'object') return;
+    try {
+      Object.entries(diskData).forEach(([rawKey, val]) => {
+        let tableName = rawKey;
+        if (tableName.startsWith('sqlite_')) {
+          tableName = tableName.replace(/^sqlite_/, '');
+        } else if (tableName.startsWith(STORAGE_PREFIX)) {
+          tableName = tableName.replace(new RegExp(`^${STORAGE_PREFIX}`), '');
+        }
+
+        if (this.memoryTables.has(tableName)) {
+          const tableMap = this.memoryTables.get(tableName)!;
+          if (Array.isArray(val)) {
+            tableMap.clear();
+            val.forEach((row: any) => {
+              const id = row.id || row.key || String(Math.random());
+              tableMap.set(id, row);
+            });
+            try {
+              localStorage.setItem(`${STORAGE_PREFIX}${tableName}`, JSON.stringify(val));
+            } catch {}
+          } else if (val && typeof val === 'object') {
+            tableMap.set(val.id || 'profile_main', val);
+            try {
+              localStorage.setItem(`${STORAGE_PREFIX}${tableName}`, JSON.stringify([val]));
+            } catch {}
+          }
+        }
+      });
+      this.notifySubscribers();
+    } catch (err) {
+      console.error('Failed to hydrate SQLite tables from disk data:', err);
+    }
+  }
+
+  /**
    * Load table records from local disk / persistent store
    */
   private loadAllFromPersistentStorage(): void {

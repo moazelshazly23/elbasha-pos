@@ -184,12 +184,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`h-[calc(100vh-4rem)] bg-white border-l border-[#E8DFD5] flex flex-col justify-between transition-all duration-200 sticky top-16 z-30 select-none shadow-xs ${
+      className={`h-full max-h-[calc(100vh-4rem)] bg-white border-l border-[#E8DFD5] flex flex-col justify-between transition-all duration-200 select-none shadow-2xs shrink-0 ${
         collapsed ? 'w-16' : 'w-64'
       }`}
     >
       {/* Navigation list */}
-      <div className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
+      <div className="flex-1 overflow-y-auto pt-2 pb-2 px-2 space-y-1">
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -198,16 +198,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => onSelectTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all relative group ${
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all relative group cursor-pointer ${
                 isActive
-                  ? 'bg-[#8B1E1E] text-white shadow-sm'
-                  : 'text-[#3E2723] hover:bg-[#F5EFE6] hover:text-[#8B1E1E]'
+                  ? 'bg-[#140E0B] text-amber-200 shadow-sm'
+                  : 'text-[#4A3B32] hover:bg-[#F7F4EE] hover:text-[#8B1E1E]'
               }`}
               title={collapsed ? item.label : undefined}
             >
               <Icon
-                className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${
-                  isActive ? 'text-white' : 'text-[#8B1E1E]'
+                className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-105 ${
+                  isActive ? 'text-[#C59A3F]' : 'text-[#8B1E1E]'
                 }`}
               />
 
@@ -217,10 +217,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               {item.badge !== undefined && item.badge > 0 && (
                 <span
-                  className={`px-1.5 py-0.5 text-[10px] font-extrabold rounded-full tabular-nums ${
+                  className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full font-num ${
                     isActive
-                      ? 'bg-white text-[#8B1E1E]'
-                      : 'bg-red-600 text-white animate-pulse'
+                      ? 'bg-[#C59A3F] text-[#140E0B]'
+                      : 'bg-red-600 text-white'
                   }`}
                 >
                   {item.badge}
@@ -229,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               {/* Tooltip on collapsed hover */}
               {collapsed && (
-                <div className="absolute right-full mr-2 px-2 py-1 bg-[#231610] text-white text-xs rounded-md shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+                <div className="absolute right-full mr-2 px-2.5 py-1 bg-[#140E0B] text-white text-xs rounded-lg shadow-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap border border-white/10">
                   {item.label}
                   {item.badge !== undefined && item.badge > 0 && ` (${item.badge})`}
                 </div>
@@ -240,11 +240,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* User Profile Quick Card */}
-      <div className="p-2 border-t border-[#E8DFD5] bg-[#FFFBF7]">
+      <div className="p-2 border-t border-[#E8DFD5] bg-[#FDFBF7]">
         {!collapsed ? (
-          <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-white border border-[#E8DFD5] shadow-2xs">
+          <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white border border-[#E5DACB] shadow-2xs">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-[#8B1E1E] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+              <div className="w-8 h-8 rounded-lg bg-[#8B1E1E] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                 {currentUser?.avatar || (currentUser?.name || 'م').slice(0, 1)}
               </div>
               <div className="min-w-0 flex-1 text-right leading-tight">

@@ -6,10 +6,12 @@ var electronAPI = {
   getPrinters: () => ipcRenderer.invoke("get-printers"),
   // System & Path Management
   getSystemInfo: () => ipcRenderer.invoke("get-system-info"),
-  // SQLite Persistence Bridge
+  // SQLite & Application Persistence Bridge
   sqliteEnsurePath: (payload) => ipcRenderer.invoke("sqlite-ensure-path", payload),
   sqliteWriteSnapshot: (payload) => ipcRenderer.invoke("sqlite-write-snapshot", payload),
   saveAppData: (payload) => ipcRenderer.invoke("save-app-data", payload),
+  loadAppData: (payload) => ipcRenderer.invoke("load-app-data", payload),
+  loadAllData: () => ipcRenderer.invoke("load-all-data"),
   // Backup & Restore
   backupDatabase: () => ipcRenderer.invoke("backup-database"),
   restoreDatabase: (payload) => ipcRenderer.invoke("restore-database", payload),

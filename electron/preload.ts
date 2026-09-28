@@ -15,10 +15,12 @@ const electronAPI = {
   // System & Path Management
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
 
-  // SQLite Persistence Bridge
+  // SQLite & Application Persistence Bridge
   sqliteEnsurePath: (payload: SQLitePathPayload) => ipcRenderer.invoke('sqlite-ensure-path', payload),
   sqliteWriteSnapshot: (payload: SQLiteSnapshotPayload) => ipcRenderer.invoke('sqlite-write-snapshot', payload),
   saveAppData: (payload: { key: string; data: string }) => ipcRenderer.invoke('save-app-data', payload),
+  loadAppData: (payload: { key: string }) => ipcRenderer.invoke('load-app-data', payload),
+  loadAllData: () => ipcRenderer.invoke('load-all-data'),
 
   // Backup & Restore
   backupDatabase: () => ipcRenderer.invoke('backup-database'),

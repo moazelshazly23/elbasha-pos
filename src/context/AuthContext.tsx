@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Branch } from '../types';
 import { posDb } from '../services/db';
 import { initialBranches } from '../services/seedData';
+import { AppAuthUser } from '../services/firebase/authService';
 
 const AUTH_STORAGE_KEYS = {
   SESSION: 'basha_pos_auth_session',
@@ -30,6 +31,7 @@ interface AuthContextType {
   setCurrentBranch: (branch: Branch) => void;
   switchUser: (user: User) => void;
   login: (credential: string, password?: string) => { success: boolean; message?: string };
+  loginWithGoogle: (fbUser: AppAuthUser) => { success: boolean; message?: string };
   logout: () => void;
   lockTerminal: () => void;
   hasPermission: (permission: string) => boolean;
@@ -211,6 +213,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true };
     }
     return { success: false, message: 'اسم المستخدم أو كلمة المرور أو رمز PIN غير صحيح' };
+  };
+
+  const loginWithGoogle = (fbUser: AppAuthUser) => {
+    let matched: User | undefined = users.find((u) => u.email === fbUser.email || u.id === `google_${fbUser.uid}`);
+    if (!matched) {
+      const newUser: User = {
+        id: `google_${fbUser.uid}`,
+        username: fbUser.email ? fbUser.email.split('@')[0] : 'google_admin',
+        name: fbUser.displayName || 'مدير Google',
+        role: (fbUser.role as any) || 'admin',
+        pin: '0000',
+        active: true,
+        branchId: currentBranch?.id || 'branch-1',
+        permissions: ['all'],
+        createdAt: new Date().toISOString(),
+      };
+      try {
+        posDb.saveUser(newUser);
+      } catch (e) {
+        console.warn('Could not add local google user:', e);
+      }
+      matched = newUser;
+    }
+
+    setCurrentUser(matched);
+    setIsAuthenticated(true);
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEYS.LOGGED_OUT);
+      const sessionData = JSON.stringify({
+        userId: matched.id,
+        username: matched.username,
+        name: matched.name,
+        role: matched.role,
+        authProvider: 'firebase_google',
+        loggedInAt: new Date().toISOString(),
+      });
+      localStorage.setItem(AUTH_STORAGE_KEYS.SESSION, sessionData);
+      localStorage.setItem(AUTH_STORAGE_KEYS.CURRENT_USER, sessionData);
+      posDb.logAudit({
+        userId: matched.id,
+        userName: matched.name,
+        action: 'تسجيل دخول Google',
+        category: 'auth',
+        details: `تسجيل الدخول عبر Google Firebase: ${matched.name} (${matched.role})`,
+      });
+    } catch (e) {
+      console.warn('Session write warning:', e);
+    }
+
+    return { success: true };
   };
 
   const logout = () => {
@@ -398,6 +450,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentBranch,
         switchUser,
         login,
+        loginWithGoogle,
         logout,
         lockTerminal,
         hasPermission,
